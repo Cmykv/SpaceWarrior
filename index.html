@@ -15,6 +15,11 @@
 		<script src="lib/three/examples/js/loaders/FBXLoader.js"></script>
 		<script src="lib/three/examples/js/libs/fflate.min.js"></script>
 		<script src="lib/three/examples/js/controls/OrbitControls.js"></script>
+		<script src="lib/three/examples/js/postprocessing/EffectComposer.js"></script>
+		<script src="lib/three/examples/js/postprocessing/RenderPass.js"></script>
+		<script src="lib/three/examples/js/postprocessing/OutlinePass.js"></script>
+		<script src="lib/three/examples/js/postprocessing/ShaderPass.js"></script>
+		<script src="lib/three/examples/js/postprocessing/UnrealBloomPass.js"></script>
 		<script src="lib/lil-gui.umd.min.js"></script>
 		<script src="lib/three-vrm.js"></script>
 		<!--
@@ -131,7 +136,6 @@ tools</button> -->
                         color: rgb(172, 39, 39);
                         display: inline-block;
                     ">
-					<i class="mdui-icon material-icons">error_outline</i>
 				</div>
 				<span style="
                         line-height: 40px;
@@ -148,7 +152,7 @@ tools</button> -->
                     overflow: scroll;
                 " v-bind:style="{ backgroundColor: bgcolor}">
 				<div style="width: calc(100% - 50px); margin: 25px" v-bind:style="{ color: textColor}">
-					<div v-show="!(showOpts||showOpts2)">
+					<div v-show="!(showOpts)">
 						<h1 style="
                                 display: inline-block;
                                 vertical-align: middle;
@@ -192,7 +196,7 @@ tools</button> -->
 						<ul class="mdui-list" style="margin-top: 20px">
 							<li class="mdui-list-item mdui-ripple"
 								onclick="app.showSketelon?gui.hide():gui.show();app.showSketelon=!app.showSketelon">
-								<div class="mdui-list-item-content" style="margin-left: 30px">
+								<div class="mdui-list-item-content">
 									Show skeleton
 								</div>
 							</li>
@@ -247,15 +251,6 @@ tools</button> -->
 						</div>
 					</div>
 				</div>
-
-				<div v-show="showOpts2" id="jsoneditor" style="
-                        position: fixed;
-                        top: 70px;
-                        background: #000;
-                        height: calc(100vh - 71px);
-                        z-index: 1000;
-                        width: calc(var(--side-bar-width) - 1px);
-                    "></div>
 			</div>
 		</div>
 		<script>
@@ -280,7 +275,9 @@ tools</button> -->
 			var clock = new THREE.Clock();
 			// gltf and vrm
 			var loader = null;
-			var bulletArr=[]
+			var bulletArr = [];
+			var innerWidth = document.querySelector("#model").clientWidth;
+			var innerHeight = document.querySelector("#model").clientHeight;
 
 			function setBackground() {
 				const textureLoader = new THREE.TextureLoader();
@@ -305,18 +302,24 @@ tools</button> -->
 
 			function createBullet(pos) {
 				const geometry = new THREE.SphereGeometry(0.05, 32, 32);
-				const material = new THREE.MeshBasicMaterial({
-					color: '#CC0000'
+				const material = new THREE.MeshPhongMaterial({
+					color: 0x000000, // 设置球体颜色
+					emissive: 0xff0000, // 设置自发光颜色为红色
+					emissiveIntensity: 10, // 设置自发光强度为1
+					metalness: 0.6, // 金属度，对于玻璃应设置为0
+					roughness: 0.05, // 粗糙度，较低的值产生更光滑的反射
+					transparency: 0.9,
 				});
 				const sphere = new THREE.Mesh(geometry, material);
 				sphere.position.x = 0;
 				sphere.position.y = 1.3;
 				sphere.position.z = 0.8;
 				scene.add(sphere);
-				var bullet={};
-				bullet.obj=sphere;
-				bullet.speed=0.3;
-				bullet.angle=avatarRotY;
+				var bullet = {};
+				bullet.obj = sphere;
+				bullet.speed = 0.1;
+				bullet.angle = avatarRotY;
+				bullet.distance = 0;
 				bulletArr.push(bullet)
 			}
 
@@ -332,7 +335,6 @@ tools</button> -->
 					gltf.animations.forEach((clip) => {
 						//console.log(clip)
 						actions["walk"] = animationMixer.clipAction(clip);
-						actions["walk"].weight = 0;
 					});
 
 				})
@@ -387,7 +389,7 @@ tools</button> -->
 					if (newActionName === 'jump' || newActionName === 'death' || newActionName === 'walk' || newActionName ===
 						'shoot') {
 						newAction.loop = THREE.LoopOnce;
-						//newAction.clampWhenFinished = true; // 停止在最后一帧
+						newAction.clampWhenFinished = true; // 停止在最后一帧
 					}
 
 					currentAction = newAction; // 设置新的活动动作
@@ -403,7 +405,7 @@ tools</button> -->
 			function setFloor() {
 				var planeGeometry = new THREE.PlaneGeometry(100, 100);
 				var planeMaterial = new THREE.MeshStandardMaterial({
-					color: 0xcccccc
+					color: 0x999999
 				});
 
 				var plane = new THREE.Mesh(planeGeometry, planeMaterial);
@@ -426,7 +428,6 @@ tools</button> -->
 					showSketelon: false,
 					bones: [],
 					showOpts: false,
-					showOpts2: false,
 					loaded: false,
 					failed: false,
 					failedText: "加载失败",
@@ -471,6 +472,9 @@ tools</button> -->
 				document.querySelector("#model").clientWidth,
 				document.querySelector("#model").clientHeight
 			);
+			renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
+			renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
+			renderer.toneMappingExposure = 1; // 色调映射曝光
 			renderer.setPixelRatio(window.devicePixelRatio);
 			// renderer.setClearColor(0x000000,1); //设置背景颜色
 			document.querySelector("#model").appendChild(renderer.domElement);
@@ -520,6 +524,8 @@ tools</button> -->
 
 			var skeletonHelper;
 
+
+
 			var lightBoosterAmbient = app.model.lightAmbient ?
 				app.model.lightAmbient :
 				1.0;
@@ -552,7 +558,7 @@ tools</button> -->
 			scene.add(light3);
 
 
-			cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+			cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
 			cubeMaterial = new THREE.MeshDepthMaterial({
 				color: 0x444fff
 			});
@@ -664,29 +670,41 @@ tools</button> -->
 				if (animationMixer != null)
 					animationMixer.update(clock.getDelta());
 
+				let bulletList = [];
+				bulletArr.forEach(item => {
+					if (item.distance < 30)
+						bulletList.push(item);
+				})
+				bulletArr = bulletList;
+
 
 				if (
 					(currentAction === actions['walk'] || currentAction === actions['jump'] || currentAction === actions[
 						'shoot']) &&
 					currentAction.time >= currentAction.getClip().duration
 				) {
-					createBullet(avatar.position)
+					console.log(avatar.position);
+					if (currentAction === actions['shoot'])
+						createBullet(avatar.position);
 					switchAction('idle', 0.3);
-					
 				}
-				bulletArr.forEach(item=>{
-					var dx=item.speed*Math.sin(item.angle);
-					var dz=item.speed*Math.cos(item.angle);
-					item.obj.position.x+=dx;
-					item.obj.position.z+=dz;
+				bulletArr.forEach(item => {
+					var dx = item.speed * Math.sin(item.angle);
+					var dz = item.speed * Math.cos(item.angle);
+					item.obj.position.x += dx;
+					item.obj.position.z += dz;
+					item.distance += item.speed;
 				})
-				
+
 
 				// 当处于 running 动作时，移动相机
 				if (
 					currentAction === actions['walk']
 				) {
-					avatar.position.z += 0.025;
+					var dx = 0.03 * Math.sin(avatarRotY);
+					var dz = 0.03 * Math.cos(avatarRotY);
+					avatar.position.z += dz;
+					avatar.position.x += dx;
 				}
 				if (avatar != null) {
 					// 更新控制器的目标为NPC的位置
