@@ -16,7 +16,9 @@ var app = new Vue({
 		color: '#ff0000',
 		bgcolor: '#ffffff',
 		textColor: '#0000ff',
-		showSketelon: false,
+		showSetting: false,
+		cameraDistance: 3,
+		doublePlayer: false,
 		bones: [],
 		showOpts: false,
 		loaded: false,
@@ -40,6 +42,7 @@ var innerWidth = document.querySelector("#model").clientWidth;
 var innerHeight = document.querySelector("#model").clientHeight;
 const scene = new THREE.Scene();
 var skeletonHelper;
+let composer;
 
 function setBackground() {
 	const textureLoader = new THREE.TextureLoader();
@@ -61,49 +64,33 @@ function setControll() {
 }
 
 function setLight() {
-	var lightBoosterAmbient = app.model.lightAmbient ?
-		app.model.lightAmbient :
-		1.0;
-	var lightBoosterDirectionalHigh = app.model.lightDirectionalHigh ?
-		app.model.lightDirectionalHigh :
-		1.0;
-	var lightBoosterDirectional = app.model.lightDirectional ?
-		app.model.lightDirectional :
-		0.0;
-
 	const light = new THREE.AmbientLight(
 		0xffffff,
-		0.8 * lightBoosterAmbient
+		0.6
 	);
 	light.position.set(10.0, 10.0, 10.0).normalize();
 	scene.add(light);
 	var light2 = new THREE.DirectionalLight(
 		0xffffff,
-		1 * lightBoosterDirectionalHigh
+		1.5
 	);
-	light2.position.set(0, 3, 2);
+	light2.position.set(0, 3, -3);
 	light2.castShadow = true;
 	scene.add(light2);
-	var light3 = new THREE.DirectionalLight(
-		0xffffff,
-		1 * lightBoosterDirectional
-	);
-	light3.position.set(0, 0, 2);
-	light3.castShadow = true;
-	scene.add(light3);
+
 }
 
 function createBox() {
 	cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
-	cubeMaterial = new THREE.MeshDepthMaterial({
-		color: 0x444fff
+	cubeMaterial = new THREE.MeshLambertMaterial({
+		color: 0xff5500
 	});
 
 	cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
 	cube.position.x = 3;
 	cube.position.y = 0.5;
 	cube.position.z = 3;
-
+	//cube.layers.set(1);
 	//告诉立方体需要投射阴影
 	cube.castShadow = true;
 
@@ -123,13 +110,24 @@ function readMoveJson() {
 	})
 }
 
+const textureLoader = new THREE.TextureLoader();
+//const map = textureLoader.load('./lib/lensflare/lensflare0.png');
 
 function createBullet(pos) {
-	let sphere = createGlowBall();
+	const geometry = new THREE.SphereGeometry(0.1, 50, 50);
+	//const material = new THREE.MeshBasicMaterial({ map: map });
+	const material = new THREE.MeshPhongMaterial({
+	    color: 0xff0000, // 设置材质颜色
+	    specular: 0xffffff, // 设置高光颜色
+	    shininess: 100, // 设置高光强度
+	    combine: THREE.MixOperation, // 设置环境映射的混合模式
+	    reflectivity: 3 // 设置材质的反射强度
+	});
+	let sphere = new THREE.Mesh(geometry, material);;
 	sphere.position.x = pos.x + 0;
 	sphere.position.y = 1.3;
 	sphere.position.z = pos.z + 0.8;
-
+	//sphere.layers.set(1);
 	scene.add(sphere);
 	var bullet = {};
 	bullet.obj = sphere;
@@ -139,56 +137,6 @@ function createBullet(pos) {
 	bulletArr.push(bullet)
 }
 
-function createGlowBall() {
-	const haloVertexShader = /*glsl*/ `
-	
-	uniform vec3 viewVector;
-	uniform float c;
-	uniform float p;
-	varying float intensity;
-	void main() 
-	{
-	    vec3 vNormal = normalize( normalMatrix * normal );
-		vec3 vNormel = normalize( normalMatrix * viewVector );
-		intensity = pow( c - dot(vNormal, vNormel), p );
-		
-	    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-	}
-	`;
-
-	const haloFragmentShader = /*glsl*/ `
-	
-	uniform vec3 glowColor;
-	varying float intensity;
-	void main() 
-	{
-		vec3 glow = glowColor * intensity;
-	    gl_FragColor = vec4( glow, 1.0 );
-	}
-	`;
-
-	const halo = new THREE.Mesh(
-
-		new THREE.SphereGeometry(0.1, 50, 50),
-
-		new THREE.ShaderMaterial( 
-			{
-			    uniforms: 
-				{ 
-					"c":   { type: "f", value: 1.0 },
-					"p":   { type: "f", value: 1.4 },
-					glowColor: { type: "c", value: new THREE.Color(0xff0000) },
-					viewVector: { type: "v3", value: camera.position }
-				},
-				vertexShader: haloVertexShader,
-				fragmentShader:haloFragmentShader,
-				side: THREE.FrontSide,
-				blending: THREE.AdditiveBlending,
-				transparent: false
-			}   ));
-	return halo;
-
-}
 
 function loadAvatar() {
 	if (theModel.type == "fbx") {
@@ -433,6 +381,7 @@ function toggleShow(k, obj) {
 	}
 }
 
+
 const renderer = new THREE.WebGLRenderer({
 	alpha: true,
 	antialias: true,
@@ -444,10 +393,12 @@ renderer.setSize(
 	document.querySelector("#model").clientHeight
 );
 renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
+//ReinhardToneMapping
 renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
-renderer.toneMappingExposure = 0.7; // 色调映射曝光
+//renderer.toneMapping = THREE.ReinhardToneMapping; // 色调映射
+renderer.toneMappingExposure = 0.9; // 色调映射曝光
 renderer.setPixelRatio(window.devicePixelRatio);
-// renderer.setClearColor(0x000000,1); //设置背景颜色
+renderer.setClearColor(0x000000, 1); //设置背景颜色
 document.querySelector("#model").appendChild(renderer.domElement);
 
 
@@ -455,13 +406,38 @@ document.querySelector("#model").appendChild(renderer.domElement);
 
 // camera
 const camera = new THREE.PerspectiveCamera(
-	30.0,
+	50,
 	document.querySelector("#model").clientWidth /
 	document.querySelector("#model").clientHeight,
 	0.1,
-	20.0
+	50.0
 );
-camera.position.set(0, 3, -10);
+camera.position.set(-1, 3, -10);
+
+const params = {
+	exposure: 0,
+	bloomStrength: 1.5,
+	bloomThreshold: 0,
+	bloomRadius: 0,
+};
+const initComposer = () => {
+	composer = new THREE.EffectComposer(renderer);
+
+	const renderScene = new THREE.RenderPass(scene, camera);
+	// 光晕
+	const bloomPass = new THREE.UnrealBloomPass(
+		new THREE.Vector2(document.querySelector("#model").clientWidth, document.querySelector("#model")
+			.clientHeight),
+		1.5,
+		0.4,
+		0.85
+	);
+	bloomPass.threshold = params.bloomThreshold;
+	bloomPass.strength = params.bloomStrength;
+	bloomPass.radius = params.bloomRadius;
+	composer.addPass(renderScene);
+	composer.addPass(bloomPass);
+};
 
 window.addEventListener(
 	"resize",
@@ -481,19 +457,17 @@ window.addEventListener(
 
 // scene
 
-setBackground();
+//setBackground();
 setFloor();
 loadAvatar();
 setLight();
-setHelper();
+//setHelper();
 //setControll();
+initComposer();
 createBox();
 
 
-
-
 function animate() {
-	requestAnimationFrame(animate);
 	if (animationMixer != null)
 		animationMixer.update(clock.getDelta());
 
@@ -501,6 +475,8 @@ function animate() {
 	bulletArr.forEach(item => {
 		if (item.distance < 30)
 			bulletList.push(item);
+		else
+			scene.remove(item.obj)
 	})
 	bulletArr = bulletList;
 
@@ -563,9 +539,9 @@ function animate() {
 		camera.lookAt(walkerPosition);
 	}
 
-
-
+	//composer.render();
 	renderer.render(scene, camera);
+	requestAnimationFrame(animate);
 }
 
 animate();
@@ -575,59 +551,24 @@ var gui = new GUI();
 gui.hide();
 
 function setupDatGui() {
-	let folder = gui.addFolder("Skeletons");
+	let folder = gui.addFolder("Settings");
 
 	folder.add(skeletonHelper, "visible");
 	setTimeout(() => {
 		folder.add(avatar, "visible");
-		folder.controllers[1].name("Show Avatar");
+		folder.controllers[3].name("Show Avatar");
 	}, 5000);
 	folder.controllers[0].name("Show Skeleton");
 
-	const bones = skeletonHelper.bones;
+	folder.add(camera.position, "z", -10, 10);
+	folder.controllers[1].name("camera distance");
 
-	for (let i = 0; i < bones.length; i++) {
-		const bone = bones[i];
+	folder.add(app, "doublePlayer");
+	folder.controllers[2].name("double player");
 
-		folder = gui.addFolder("Bone: " + bone.name);
 
-		if (i == 0) {
-			folder.add(
-				bone.position,
-				"x",
-				-10 + bone.position.x,
-				10 + bone.position.x
-			);
-			folder.add(
-				bone.position,
-				"y",
-				-10 + bone.position.y,
-				10 + bone.position.y
-			);
-			folder.add(
-				bone.position,
-				"z",
-				-10 + bone.position.z,
-				10 + bone.position.z
-			);
-		}
 
-		folder.add(bone.rotation, "x", -Math.PI, Math.PI);
-		folder.add(bone.rotation, "y", -Math.PI, Math.PI);
-		folder.add(bone.rotation, "z", -Math.PI, Math.PI);
-		if (i == 0) {
-			folder.controllers[0].name("position.x");
-			folder.controllers[1].name("position.y");
-			folder.controllers[2].name("position.z");
-			folder.controllers[3].name("rotation.x");
-			folder.controllers[4].name("rotation.y");
-			folder.controllers[5].name("rotation.z");
-		} else {
-			folder.controllers[0].name("rotation.x");
-			folder.controllers[1].name("rotation.y");
-			folder.controllers[2].name("rotation.z");
-		}
-	}
+
 	var guiroot = document.querySelector(".lil-gui.root");
 	guiroot.style.left = "calc(calc(100vw - var(--side-bar-width)) + 19.1vw - 122px)";
 	guiroot.style.webkitAppRegion = "no-drag";

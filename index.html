@@ -18,9 +18,10 @@
 		<script src="lib/three/examples/js/controls/PointerLockControls.js"></script>
 		<script src="lib/three/examples/js/postprocessing/EffectComposer.js"></script>
 		<script src="lib/three/examples/js/postprocessing/RenderPass.js"></script>
-		<script src="lib/three/examples/js/postprocessing/OutlinePass.js"></script>
 		<script src="lib/three/examples/js/postprocessing/ShaderPass.js"></script>
 		<script src="lib/three/examples/js/postprocessing/UnrealBloomPass.js"></script>
+		<script src="lib/three/examples/js/shaders/CopyShader.js"></script>
+		<script src="lib/three/examples/js/shaders/LuminosityHighPassShader.js"></script>
 		<script src="lib/lil-gui.umd.min.js"></script>
 		<script src="lib/three-vrm.js"></script>
 		<!--
@@ -153,7 +154,7 @@ tools</button> -->
                     overflow: scroll;
                 " v-bind:style="{ backgroundColor: bgcolor}">
 				<div style="width: calc(100% - 50px); margin: 25px" v-bind:style="{ color: textColor}">
-					<div v-show="!(showOpts)">
+					<div>
 						<h1 style="
                                 display: inline-block;
                                 vertical-align: middle;
@@ -178,7 +179,7 @@ tools</button> -->
 						</div>
 						<div style="width: 100%; margin-top: 20px; display:block ">
 							<div style="
-                                    width: 25vw;
+                                    width: 22vw;
                                     height: 15vw;
                                     margin: auto;
                                     border-radius: 20px;
@@ -194,61 +195,17 @@ tools</button> -->
                                     " />
 							</div>
 						</div>
-						<ul class="mdui-list" style="margin-top: 20px">
-							<li class="mdui-list-item mdui-ripple"
-								onclick="app.showSketelon?gui.hide():gui.show();app.showSketelon=!app.showSketelon">
-								<div class="mdui-list-item-content">
-									Show skeleton
-								</div>
-							</li>
-							<li>
-								Game Controll
-							</li>
-							<li>
-								key A: turn left
-							</li>
-							<li>
-								key D: turn right
-							</li>
-							<li>
-								key J: fire
-							</li>
-							<li>
-								key K: jump
-							</li>
-
-
-						</ul>
-					</div>
-
-
-					<div v-if="model.type == 'vrm'" v-show="showOpts" style="margin-top: 80px">
-						<ul class="mdui-list" style="margin-top: 20px">
-							<li v-for="(k,i) in Object.keys(model.accessories)" class="mdui-list-item mdui-ripple"
-								xf-show="true" v-bind:onclick="'toggleShow(`'+model.accessories[k]+'`,this)'">
-								<i class="mdui-icon material-icons">
-									format_paint</i>
-								<div class="mdui-list-item-content" style="margin-left: 30px">
-									{{ + ' ' + k}}
-								</div>
-							</li>
-						</ul>
-					</div>
-
-					<div v-if="model.type != 'vrm'" v-show="showOpts" style="margin-top: 80px">
-						<div v-for="b in ['Hips','Chest','Neck', 'Spine','RightUpperArm','RightLowerArm','LeftUpperArm','LeftLowerArm','LeftUpperLeg','LeftLowerLeg','RightUpperLeg','RightLowerLeg']"
-							style="margin-top: 10px; font-size: 16px">
-							<span style="line-height: 36px">{{b}}: </span>
-							<select class="mdui-select" style="
-                                    float: right;
-                                    margin-right: 10px;
-                                    max-width: calc(100% - 20px);
-                                " v-bind:style="{ color: color}">
-								<option value="-1">None</option>
-								<option v-for="bb in bones" v-bind:value="bb.index">
-									{{bb.name}}
-								</option>
-							</select>
+						<div class="mdui-list" style="margin-top: 20px">
+							<h3>
+								score:100
+							</h3>
+							<button style=" background-color:dodgerblue;
+	            color:white;
+	            width: 100px;
+	            height: 30px;
+	            border:0;
+	            font-size: 16px;			
+                border-radius: 30px;" onclick="app.showSetting?gui.hide():gui.show();app.showSetting=!app.showSetting">setting</button>
 						</div>
 					</div>
 				</div>
