@@ -117,10 +117,9 @@ tools</button> -->
                     height: 40px;
                     border-radius: 20px;
                     background-color: #fffe;
+					text-align: center
                 " class="mdui-shadow-5" v-show="!loaded">
-				<div class="mdui-spinner mdui-spinner-colorful" style="margin: 10px 15px; width: 20px; height: 20px">
-				</div>
-				<span style="line-height: 40px; position: fixed; color: #555">loading</span>
+				<span style="line-height: 40px; color: #555">loading</span>
 			</div>
 			<div style="
                     position: fixed;
@@ -130,18 +129,11 @@ tools</button> -->
                     height: 40px;
                     border-radius: 20px;
                     background-color: #fffe;
+					text-align: center
                 " class="mdui-shadow-5" v-show="failed">
-				<div style="
-                        margin: 8px 15px;
-                        width: 20px;
-                        height: 20px;
-                        color: rgb(172, 39, 39);
-                        display: inline-block;
-                    ">
-				</div>
+			
 				<span style="
                         line-height: 40px;
-                        position: fixed;
                         color: rgb(172, 39, 39);
                     ">{{failedText}}</span>
 			</div>
@@ -199,13 +191,13 @@ tools</button> -->
 							<h3>
 								score:100
 							</h3>
-							<button style=" background-color:dodgerblue;
+							<button id="btn_set" style=" background-color:dodgerblue;
 	            color:white;
 	            width: 100px;
 	            height: 30px;
 	            border:0;
 	            font-size: 16px;			
-                border-radius: 30px;" onclick="app.showSetting?gui.hide():gui.show();app.showSetting=!app.showSetting">setting</button>
+                border-radius: 30px;">setting</button>
 						</div>
 					</div>
 				</div>
