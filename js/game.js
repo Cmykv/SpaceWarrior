@@ -33,7 +33,8 @@
 		skeletonHelper: null,
 		actions: [],
 		animationMixer: null,
-		score: 0
+		score: 0,
+		foot: null
 	};
 	var player2 = {
 		id: 2,
@@ -45,7 +46,8 @@
 		skeletonHelper: null,
 		actions: [],
 		animationMixer: null,
-		score: 0
+		score: 0,
+		foot: null
 	};
 
 	var clock = new THREE.Clock();
@@ -58,18 +60,25 @@
 
 	let composer;
 	const textureLoader = new THREE.TextureLoader();
-	document.getElementById("btn_set").onclick= ()=>{
-		console.log(111);
-		if(app.showSetting)
-		{
+	document.getElementById("btn_set").onclick = () => {
+		if (app.showSetting) {
 			gui.show();
-		}
-		else
-		{
+		} else {
 			gui.hide();
 		}
-		app.showSetting=!app.showSetting
+		app.showSetting = !app.showSetting
 	}
+
+	var modal = document.getElementById("myModal");
+	document.getElementById("btn_start").onclick = () => {
+		modal.style.display = "none";
+	}
+	/*
+	span.onclick = function() {
+	  modal.style.display = "none";
+	}
+	*/
+
 
 	function setBackground() {
 		const textureLoader = new THREE.TextureLoader();
@@ -181,6 +190,24 @@
 					});
 					scene.add(player.model);
 					player.avatarRotY = player.model.rotation.y;
+
+					const geometry = new THREE.CircleGeometry(0.6, 32, 0, Math.PI * 2);
+					var color = player.id==1? 0xff0000: 0x0000ff;
+					const material = new THREE.MeshBasicMaterial({
+						color: color,
+						side: THREE.DoubleSide,
+						transparent: true,
+						opacity:0.4
+					});
+					const circle = new THREE.Mesh(geometry, material);
+					circle.position.y = 0.1;
+					circle.position.x=pos.x;
+					circle.position.z=pos.z;
+					circle.rotation.x = Math.PI / 2;
+					player.circle = circle;
+					scene.add(circle);
+
+
 					resolve(1)
 				},
 
@@ -489,24 +516,28 @@
 		) {
 			var dz = 0.03;
 			player.model.position.z += dz;
+			player.circle.position.z =player.model.position.z;
 		}
 		if (
 			player.currentAction === player.actions['walk_backward']
 		) {
 			var dz = -0.03;
 			player.model.position.z += dz;
+			player.circle.position.z =player.model.position.z;
 		}
 		if (
 			player.currentAction === player.actions['walk_left']
 		) {
 			var dx = 0.03;
 			player.model.position.x += dx;
+			player.circle.position.x =player.model.position.x;
 		}
 		if (
 			player.currentAction === player.actions['walk_right']
 		) {
 			var dx = -0.03;
 			player.model.position.x += dx;
+			player.circle.position.x =player.model.position.x;
 		}
 	}
 
@@ -542,7 +573,7 @@
 	}
 
 	animate();
-	
+
 	var GUI = lil.GUI;
 	var gui = new GUI();
 	gui.hide();
