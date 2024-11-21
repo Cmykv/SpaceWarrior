@@ -57,6 +57,7 @@
 	var innerWidth = document.querySelector("#model").clientWidth;
 	var innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
+	var starField;
 
 	let composer;
 	const textureLoader = new THREE.TextureLoader();
@@ -81,11 +82,23 @@
 
 
 	function setBackground() {
-		const textureLoader = new THREE.TextureLoader();
-		textureLoader.load('./model/universe.png', function(texture) {
-			// 将纹理设置为场景背景
-			scene.background = texture;
-		});
+		const geometry = new THREE.BufferGeometry(); // 创建几何体
+		const vertices = []; // 用于存储星星位置的数组
+		for (let i = 0; i < 5000; i++) { // 根据星星数量生成顶点
+			const x = THREE.MathUtils.randFloatSpread(50); // 随机生成x坐标
+			const y = THREE.MathUtils.randFloatSpread(50); // 随机生成y坐标
+			const z = THREE.MathUtils.randFloatSpread(50); // 随机生成z坐标
+			vertices.push(x, y, z); // 将生成的顶点添加到数组中
+		}
+		console.log(vertices); // 包含3000 个 随机顶点值的数组
+		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); // 将顶点添加到几何体中
+		console.log(geometry.getAttribute('position').count);
+		const material = new THREE.PointsMaterial({
+			color: 0xffffff,
+			size: 0.03
+		}); // 创建星星材质
+		starField = new THREE.Points(geometry, material); // 创建星星物体
+		scene.add(starField);
 	}
 
 	function setControll() {
@@ -192,17 +205,17 @@
 					player.avatarRotY = player.model.rotation.y;
 
 					const geometry = new THREE.CircleGeometry(0.6, 32, 0, Math.PI * 2);
-					var color = player.id==1? 0xff0000: 0x0000ff;
+					var color = player.id == 1 ? 0xff0000 : 0x0000ff;
 					const material = new THREE.MeshBasicMaterial({
 						color: color,
 						side: THREE.DoubleSide,
 						transparent: true,
-						opacity:0.4
+						opacity: 0.4
 					});
 					const circle = new THREE.Mesh(geometry, material);
 					circle.position.y = 0.1;
-					circle.position.x=pos.x;
-					circle.position.z=pos.z;
+					circle.position.x = pos.x;
+					circle.position.z = pos.z;
 					circle.rotation.x = Math.PI / 2;
 					player.circle = circle;
 					scene.add(circle);
@@ -484,14 +497,14 @@
 
 	// scene
 
-	//setBackground();
+	setBackground();
 	setFloor();
 	let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
 	let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
 	loadActions();
 	setLight();
 	setHelper();
-	//setControll();
+	setControll();
 	initComposer();
 	createBox();
 
@@ -516,28 +529,28 @@
 		) {
 			var dz = 0.03;
 			player.model.position.z += dz;
-			player.circle.position.z =player.model.position.z;
+			player.circle.position.z = player.model.position.z;
 		}
 		if (
 			player.currentAction === player.actions['walk_backward']
 		) {
 			var dz = -0.03;
 			player.model.position.z += dz;
-			player.circle.position.z =player.model.position.z;
+			player.circle.position.z = player.model.position.z;
 		}
 		if (
 			player.currentAction === player.actions['walk_left']
 		) {
 			var dx = 0.03;
 			player.model.position.x += dx;
-			player.circle.position.x =player.model.position.x;
+			player.circle.position.x = player.model.position.x;
 		}
 		if (
 			player.currentAction === player.actions['walk_right']
 		) {
 			var dx = -0.03;
 			player.model.position.x += dx;
-			player.circle.position.x =player.model.position.x;
+			player.circle.position.x = player.model.position.x;
 		}
 	}
 
@@ -568,6 +581,11 @@
 		handleActions(player1);
 		handleActions(player2);
 		//composer.render();
+		if (starField != null) {
+			starField.rotation.y += 0.0002
+			starField.rotation.x += 0.0002
+			starField.rotation.z += 0.0002
+		}
 		renderer.render(scene, camera);
 		requestAnimationFrame(animate);
 	}
