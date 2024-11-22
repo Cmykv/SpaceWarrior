@@ -62,7 +62,7 @@
 	let composer;
 	const textureLoader = new THREE.TextureLoader();
 	document.getElementById("btn_set").onclick = () => {
-		if (app.showSetting) {
+		if (!app.showSetting) {
 			gui.show();
 		} else {
 			gui.hide();
