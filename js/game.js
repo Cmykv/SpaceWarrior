@@ -6,7 +6,7 @@
 		"isBuildIn": true,
 		"picBg": "model/Vanguard.png"
 	};
-	var app = new Vue({
+	let app = new Vue({
 		el: "#vue-target",
 		data: {
 			model: theModel,
@@ -21,9 +21,11 @@
 			loaded: false,
 			failed: false,
 			failedText: "Load failed",
+			player1Score: 0,
+			player1Life: 100
 		},
 	});
-	var player1 = {
+	let player1 = {
 		id: 1,
 		model: null,
 		avatarRotY: 0,
@@ -34,9 +36,10 @@
 		actions: [],
 		animationMixer: null,
 		score: 0,
+		life: 100,
 		foot: null
 	};
-	var player2 = {
+	let player2 = {
 		id: 2,
 		model: null,
 		avatarRotY: 0,
@@ -47,20 +50,27 @@
 		actions: [],
 		animationMixer: null,
 		score: 0,
+		life: 100,
 		foot: null
 	};
 
-	var clock = new THREE.Clock();
+	let clock = new THREE.Clock();
 	// gltf and vrm
-	var loader = null;
-	var bulletArr = [];
-	var innerWidth = document.querySelector("#model").clientWidth;
-	var innerHeight = document.querySelector("#model").clientHeight;
+	let loader = null;
+	let bulletArr = [];
+	let monsterArr = [];
+	let wallArr = [];
+	let monsterDuration = 1000;
+	let innerWidth = document.querySelector("#model").clientWidth;
+	let innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
-	var starField;
+	let starField;
 
 	let composer;
 	const textureLoader = new THREE.TextureLoader();
+	let rockMap = textureLoader.load("./lib/rock.png");
+	rockMap.wrapS = THREE.RepeatWrapping;
+	rockMap.wrapT = THREE.RepeatWrapping;
 	document.getElementById("btn_set").onclick = () => {
 		if (!app.showSetting) {
 			gui.show();
@@ -70,7 +80,7 @@
 		app.showSetting = !app.showSetting
 	}
 
-	var modal = document.getElementById("myModal");
+	let modal = document.getElementById("myModal");
 	document.getElementById("btn_start").onclick = () => {
 		modal.style.display = "none";
 	}
@@ -119,7 +129,7 @@
 		);
 		light.position.set(10.0, 10.0, 10.0).normalize();
 		scene.add(light);
-		var light2 = new THREE.DirectionalLight(
+		let light2 = new THREE.DirectionalLight(
 			0xffffff,
 			1.5
 		);
@@ -129,21 +139,24 @@
 
 	}
 
-	function createBox() {
-		cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
-		cubeMaterial = new THREE.MeshLambertMaterial({
-			color: 0xff5500
-		});
+	function createWall() {
+		for (let i = 0; i < 5; i++) {
+			cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
+			cubeMaterial = new THREE.MeshLambertMaterial({
+				color: 0x2a0000
+			});
 
-		cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-		cube.position.x = 3;
-		cube.position.y = 0.5;
-		cube.position.z = 3;
-		//cube.layers.set(1);
-		//告诉立方体需要投射阴影
-		cube.castShadow = true;
+			cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+			cube.position.x = THREE.MathUtils.randFloatSpread(20);
+			cube.position.y = 0.5;
+			cube.position.z = THREE.MathUtils.randFloatSpread(20);
+			//cube.layers.set(1);
+			//告诉立方体需要投射阴影
+			cube.castShadow = true;
 
-		scene.add(cube);
+			scene.add(cube);
+			wallArr.push(cube);
+		}
 	}
 
 
@@ -164,12 +177,37 @@
 		sphere.position.z = pos.z + 0.8;
 		//sphere.layers.set(1);
 		scene.add(sphere);
-		var bullet = {};
+		let bullet = {};
 		bullet.obj = sphere;
-		bullet.speed = 0.1;
+		bullet.speed = 0.5;
 		bullet.angle = 0;
 		bullet.distance = 0;
 		bulletArr.push(bullet)
+	}
+
+	function createMonster() {
+		const geometry = new THREE.BoxGeometry(1, 1, 1);
+		//const material = new THREE.MeshBasicMaterial({ map: map });
+		const material = new THREE.MeshPhongMaterial({
+			map: rockMap,
+			//specular: 0xffffff, // 设置高光颜色
+			//shininess: 100, // 设置高光强度
+			//combine: THREE.MixOperation, // 设置环境映射的混合模式
+			//reflectivity: 3 // 设置材质的反射强度
+		});
+		let box = new THREE.Mesh(geometry, material);;
+		box.position.x = THREE.MathUtils.randFloatSpread(60) - 30;
+		box.position.y = 0.7;
+		box.position.z = THREE.MathUtils.randFloatSpread(100) + 20;
+		scene.add(box);
+		let monster = {};
+		monster.obj = box;
+		monster.speed = 0.1;
+		monster.angle = 0;
+		monster.distance = 0;
+		monster.alive = true;
+		monsterArr.push(monster);
+		setTimeout(createMonster, monsterDuration);
 	}
 
 
@@ -184,7 +222,7 @@
 			loader.load(
 				theModel.path,
 				(gltf) => {
-					var model = null;
+					let model = null;
 					if (theModel.type == "fbx") {
 						model = gltf;
 						player.model = model;
@@ -205,7 +243,7 @@
 					player.avatarRotY = player.model.rotation.y;
 
 					const geometry = new THREE.CircleGeometry(0.6, 32, 0, Math.PI * 2);
-					var color = player.id == 1 ? 0xff0000 : 0x0000ff;
+					let color = player.id == 1 ? 0xff0000 : 0x0000ff;
 					const material = new THREE.MeshBasicMaterial({
 						color: color,
 						side: THREE.DoubleSide,
@@ -253,12 +291,12 @@
 
 	function getCenter(obj) {
 		const selectedDecorationBbox = new THREE.Box3().setFromObject(obj);
-		var center = new THREE.Vector3();
+		let center = new THREE.Vector3();
 		let midPoint = selectedDecorationBbox.getCenter(center);
 	}
 
 	function loadActions() {
-		var loader = new THREE.FBXLoader();
+		let loader = new THREE.FBXLoader();
 		player1.animationMixer = new THREE.AnimationMixer(player1.model);
 		player2.animationMixer = new THREE.AnimationMixer(player2.model);
 		loader.load('./model/walkforward.fbx', function(gltf) {
@@ -376,12 +414,12 @@
 	}
 
 	function setFloor() {
-		var planeGeometry = new THREE.PlaneGeometry(100, 100);
-		var planeMaterial = new THREE.MeshStandardMaterial({
+		let planeGeometry = new THREE.PlaneGeometry(100, 100);
+		let planeMaterial = new THREE.MeshStandardMaterial({
 			color: 0x999999
 		});
 
-		var plane = new THREE.Mesh(planeGeometry, planeMaterial);
+		let plane = new THREE.Mesh(planeGeometry, planeMaterial);
 		plane.rotation.x = -0.5 * Math.PI;
 		plane.position.y = -0;
 
@@ -502,11 +540,12 @@
 	let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
 	let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
 	loadActions();
+	createMonster();
 	setLight();
 	setHelper();
 	setControll();
 	initComposer();
-	createBox();
+	createWall();
 
 	function handleActions(player) {
 		if (
@@ -524,33 +563,75 @@
 			switchAction(player, 'idle', 0.1);
 		}
 		// 当处于 running 动作时，移动相机
+		let playerBox = new THREE.Box3().setFromObject(player.model);
+		let canMove = true;
 		if (
 			player.currentAction === player.actions['walk_forward']
 		) {
-			var dz = 0.03;
-			player.model.position.z += dz;
-			player.circle.position.z = player.model.position.z;
+			wallArr.forEach(wall => {
+				if (wall.position.z > player.model.position.z) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dz = 0.03;
+				player.model.position.z += dz;
+				player.circle.position.z = player.model.position.z;
+			}
 		}
 		if (
 			player.currentAction === player.actions['walk_backward']
 		) {
-			var dz = -0.03;
-			player.model.position.z += dz;
-			player.circle.position.z = player.model.position.z;
+			wallArr.forEach(wall => {
+				if (wall.position.z < player.model.position.z) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dz = -0.03;
+				player.model.position.z += dz;
+				player.circle.position.z = player.model.position.z;
+			}
 		}
 		if (
 			player.currentAction === player.actions['walk_left']
 		) {
-			var dx = 0.03;
-			player.model.position.x += dx;
-			player.circle.position.x = player.model.position.x;
+			wallArr.forEach(wall => {
+				if (wall.position.x > player.model.position.x) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dx = 0.03;
+				player.model.position.x += dx;
+				player.circle.position.x = player.model.position.x;
+			}
 		}
 		if (
 			player.currentAction === player.actions['walk_right']
 		) {
-			var dx = -0.03;
-			player.model.position.x += dx;
-			player.circle.position.x = player.model.position.x;
+			wallArr.forEach(wall => {
+				if (wall.position.x < player.model.position.x) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dx = -0.03;
+				player.model.position.x += dx;
+				player.circle.position.x = player.model.position.x;
+			}
 		}
 	}
 
@@ -562,16 +643,38 @@
 				bulletList.push(item);
 			else
 				scene.remove(item.obj)
-		})
+		});
 		bulletArr = bulletList;
 		bulletArr.forEach(item => {
-			var dx = item.speed * Math.sin(item.angle);
-			var dz = item.speed * Math.cos(item.angle);
+			let dx = item.speed * Math.sin(item.angle);
+			let dz = item.speed * Math.cos(item.angle);
 			item.obj.position.x += dx;
 			item.obj.position.z += dz;
 			item.distance += item.speed;
-		})
-		var delta = clock.getDelta();
+		});
+
+		let monsterList = [];
+		monsterArr.forEach(item => {
+			if (item.alive && item.distance < 200) {
+				monsterList.push(item);
+			} else {
+				item.alive = false;
+				scene.remove(item.obj);
+			}
+		});
+		monsterArr = monsterList;
+
+		monsterArr.forEach(item => {
+			let dx = item.speed * Math.sin(item.angle);
+			let dz = item.speed * Math.cos(item.angle);
+			item.obj.position.x += dx;
+			item.obj.position.z -= dz;
+			item.obj.rotation.x += 0.01;
+			item.obj.rotation.z += 0.01;
+			item.distance += item.speed;
+		});
+
+		let delta = clock.getDelta();
 		if (player1.animationMixer != null) {
 			player1.animationMixer.update(delta);
 		}
@@ -579,21 +682,47 @@
 			player2.animationMixer.update(delta);
 		}
 		handleActions(player1);
-		handleActions(player2);
+		if (app.doublePlayer)
+			handleActions(player2);
 		//composer.render();
 		if (starField != null) {
 			starField.rotation.y += 0.0002
 			starField.rotation.x += 0.0002
 			starField.rotation.z += 0.0002
 		}
+		// check collide
+		let playerBox = new THREE.Box3().setFromObject(player1.model);
+		monsterArr.forEach(item => {
+			if (item.alive) {
+				let boxMeshBox = new THREE.Box3().setFromObject(item.obj);
+				if (playerBox.intersectsBox(boxMeshBox)) {
+					player1.life -= 2;
+					item.alive = false;
+				}
+				wallArr.forEach(wall => {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(boxMeshBox)) {
+						item.alive = false;
+					}
+				})
+				bulletArr.forEach(bullet=>{
+					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
+					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
+						item.alive = false;
+					}
+				})
+			}
+
+		});
+		app.player1Life = player1.life;
 		renderer.render(scene, camera);
 		requestAnimationFrame(animate);
 	}
 
 	animate();
 
-	var GUI = lil.GUI;
-	var gui = new GUI();
+	let GUI = lil.GUI;
+	let gui = new GUI();
 	gui.hide();
 	setupDatGui();
 	mdui.mutation();
@@ -605,8 +734,8 @@
 
 		folder.add(app, "doublePlayer");
 		folder.controllers[1].name("double player");
-		var guiroot = document.querySelector(".lil-gui.root");
-		guiroot.style.left = "calc(calc(100vw - var(--side-bar-width)) + 19.1vw - 122px)";
+		let guiroot = document.querySelector(".lil-gui.root");
+		guiroot.style.left = "calc(calc(100vw - let(--side-bar-width)) + 19.1vw - 122px)";
 		guiroot.style.webkitAppRegion = "no-drag";
 		guiroot.style.zIndex = "10000";
 	}
@@ -614,7 +743,7 @@
 	// keyborad control camera position
 	document.addEventListener("keydown", (event) => {
 		console.log(event);
-		var step = 0.01;
+		let step = 0.01;
 		//ArrowLeft ArrowRight
 		switch (event.key) {
 			case "w":
