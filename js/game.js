@@ -53,6 +53,15 @@
 		life: 100,
 		foot: null
 	};
+	const uniforms = {
+		iTime: {
+			value: 0
+		},
+		iResolution: {
+			value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+		}
+	};
+	
 
 	let clock = new THREE.Clock();
 	// gltf and vrm
@@ -64,7 +73,7 @@
 	let innerWidth = document.querySelector("#model").clientWidth;
 	let innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
-	let starField;
+
 
 	let composer;
 	const textureLoader = new THREE.TextureLoader();
@@ -89,26 +98,89 @@
 	  modal.style.display = "none";
 	}
 	*/
+   
+   const vertexShader = `
+   void main() {
+       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+   }
+   `;
+   
+   const fragmentShader = `
+   uniform float iTime;
+   uniform vec2 iResolution;
+   int iterations=17;
+   float formuparam=0.53;
+   
+   int volsteps= 20;
+   float stepsize= 0.1;
+   
+   float zoom=   0.800;
+   float tile=   0.850;
+   float speed=  0.0010 ;
+   
+   float brightness= 0.0015;
+   float darkmatter= 0.300;
+   float distfading= 0.730;
+   float saturation= 0.850;
+   
+   void main() {
+   		vec2 uv=gl_FragCoord.xy/iResolution.xy-.5;
+   		uv.y*=iResolution.y/iResolution.x;
+   		vec3 dir=vec3(uv*zoom,1.);
+   		float time=iTime*speed+.25;
+   	
+   
+   		float a1=.5+100.0/iResolution.x*2.;
+   		float a2=.8+100.0/iResolution.y*2.;
+   		mat2 rot1=mat2(cos(a1),sin(a1),-sin(a1),cos(a1));
+   		mat2 rot2=mat2(cos(a2),sin(a2),-sin(a2),cos(a2));
+   		dir.xz*=rot1;
+   		dir.xy*=rot2;
+   		vec3 from=vec3(1.,.5,0.5);
+   		from+=vec3(time*2.,time,-2.);
+   		from.xz*=rot1;
+   		from.xy*=rot2;
+   		
+   		//volumetric rendering
+   		float s=0.1,fade=1.;
+   		vec3 v=vec3(0.);
+   		for (int r=0; r<volsteps; r++) {
+   			vec3 p=from+s*dir*.5;
+   			p = abs(vec3(tile)-mod(p,vec3(tile*2.)));
+   			float pa,a=pa=0.;
+   			for (int i=0; i<iterations; i++) { 
+   				p=abs(p)/dot(p,p)-formuparam; 
+   				a+=abs(length(p)-pa); 
+   				pa=length(p);
+   			}
+   			float dm=max(0.,darkmatter-a*a*.001);
+   			a*=a*a; 
+   			if (r>6) fade*=1.-dm;
+   			v+=fade;
+   			v+=vec3(s,s*s,s*s*s*s)*a*brightness*fade; 
+   			fade*=distfading;
+   			s+=stepsize;
+   		}
+   		v=mix(vec3(length(v)),v,saturation);
+   		gl_FragColor = vec4(v*.01,1.);
+   }
+   `;
 
 
 	function setBackground() {
-		const geometry = new THREE.BufferGeometry(); // 创建几何体
-		const vertices = []; // 用于存储星星位置的数组
-		for (let i = 0; i < 5000; i++) { // 根据星星数量生成顶点
-			const x = THREE.MathUtils.randFloatSpread(50); // 随机生成x坐标
-			const y = THREE.MathUtils.randFloatSpread(50); // 随机生成y坐标
-			const z = THREE.MathUtils.randFloatSpread(50); // 随机生成z坐标
-			vertices.push(x, y, z); // 将生成的顶点添加到数组中
-		}
-		console.log(vertices); // 包含3000 个 随机顶点值的数组
-		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); // 将顶点添加到几何体中
-		console.log(geometry.getAttribute('position').count);
-		const material = new THREE.PointsMaterial({
-			color: 0xffffff,
-			size: 0.03
-		}); // 创建星星材质
-		starField = new THREE.Points(geometry, material); // 创建星星物体
-		scene.add(starField);
+		
+		
+		const shaderMaterial = new THREE.ShaderMaterial({
+			uniforms: uniforms,
+			vertexShader: vertexShader,
+			fragmentShader: fragmentShader,
+		});
+		
+		const geometry = new THREE.PlaneBufferGeometry(100, 100);
+		const mesh = new THREE.Mesh(geometry, shaderMaterial);
+		mesh.position.set(0,0,20);
+		mesh.rotation.y=-Math.PI;
+		scene.add(mesh);
 	}
 
 	function setControll() {
@@ -140,16 +212,16 @@
 	}
 
 	function createWall() {
-		for (let i = 0; i < 5; i++) {
+		for (let i = 0; i < 3; i++) {
 			cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
 			cubeMaterial = new THREE.MeshLambertMaterial({
 				color: 0x2a0000
 			});
 
 			cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-			cube.position.x = THREE.MathUtils.randFloatSpread(20);
+			cube.position.x = THREE.MathUtils.randFloatSpread(30);
 			cube.position.y = 0.5;
-			cube.position.z = THREE.MathUtils.randFloatSpread(20);
+			cube.position.z = THREE.MathUtils.randFloatSpread(30);
 			//cube.layers.set(1);
 			//告诉立方体需要投射阴影
 			cube.castShadow = true;
@@ -230,7 +302,7 @@
 					}
 					player.model.position.set(pos.x, pos.y, pos.z);
 					player.skeletonHelper = new THREE.SkeletonHelper(player.model);
-					player.skeletonHelper.visible = true;
+					player.skeletonHelper.visible = false;
 					player.skeletonHelper.material.linewidth = 30;
 
 					scene.add(player.skeletonHelper);
@@ -684,12 +756,7 @@
 		handleActions(player1);
 		if (app.doublePlayer)
 			handleActions(player2);
-		//composer.render();
-		if (starField != null) {
-			starField.rotation.y += 0.0002
-			starField.rotation.x += 0.0002
-			starField.rotation.z += 0.0002
-		}
+
 		// check collide
 		let playerBox = new THREE.Box3().setFromObject(player1.model);
 		monsterArr.forEach(item => {
@@ -705,7 +772,7 @@
 						item.alive = false;
 					}
 				})
-				bulletArr.forEach(bullet=>{
+				bulletArr.forEach(bullet => {
 					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
 						item.alive = false;
@@ -715,6 +782,7 @@
 
 		});
 		app.player1Life = player1.life;
+		uniforms.iTime.value += 0.05;
 		renderer.render(scene, camera);
 		requestAnimationFrame(animate);
 	}
