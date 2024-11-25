@@ -61,7 +61,7 @@
 			value: new THREE.Vector2(window.innerWidth, window.innerHeight)
 		}
 	};
-	
+
 
 	let clock = new THREE.Clock();
 	// gltf and vrm
@@ -98,14 +98,14 @@
 	  modal.style.display = "none";
 	}
 	*/
-   
-   const vertexShader = `
+
+	const vertexShader = `
    void main() {
        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
    }
    `;
-   
-   const fragmentShader = `
+
+	const fragmentShader = `
    uniform float iTime;
    uniform vec2 iResolution;
    int iterations=17;
@@ -168,18 +168,18 @@
 
 
 	function setBackground() {
-		
-		
+
+
 		const shaderMaterial = new THREE.ShaderMaterial({
 			uniforms: uniforms,
 			vertexShader: vertexShader,
 			fragmentShader: fragmentShader,
 		});
-		
+
 		const geometry = new THREE.PlaneBufferGeometry(100, 100);
 		const mesh = new THREE.Mesh(geometry, shaderMaterial);
-		mesh.position.set(0,0,20);
-		mesh.rotation.y=-Math.PI;
+		mesh.position.set(0, 0, 20);
+		mesh.rotation.y = -Math.PI;
 		scene.add(mesh);
 	}
 
@@ -258,14 +258,10 @@
 	}
 
 	function createMonster() {
-		const geometry = new THREE.BoxGeometry(1, 1, 1);
+		const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
 		//const material = new THREE.MeshBasicMaterial({ map: map });
 		const material = new THREE.MeshPhongMaterial({
-			map: rockMap,
-			//specular: 0xffffff, // 设置高光颜色
-			//shininess: 100, // 设置高光强度
-			//combine: THREE.MixOperation, // 设置环境映射的混合模式
-			//reflectivity: 3 // 设置材质的反射强度
+			map: rockMap
 		});
 		let box = new THREE.Mesh(geometry, material);;
 		box.position.x = THREE.MathUtils.randFloatSpread(60) - 30;
@@ -444,8 +440,7 @@
 		});
 		setTimeout(() => {
 			app.loaded = true;
-			console.log(player1.actions);
-			console.log(player2.actions);
+			console.log(player1.actions["shoot"]);
 			player1.actions["idle"].play();
 			player2.actions["idle"].play();
 			player1.currentAction = player1.actions["idle"];
@@ -460,28 +455,30 @@
 		console.log("switch to action " + newActionName, player.id)
 		const newAction = player.actions[newActionName];
 		if (newAction && player.currentAction !== newAction) {
-			player.previousAction = player.currentAction; // 保留当前的动作
-			// 淡出前一个动作
+			player.previousAction = player.currentAction;
 			if (player.previousAction) {
 				player.previousAction.fadeOut(fadeDuration);
 			}
 
-			// 如果切换到 jump 动作，设置播放一次并在结束后停止
 			if (newActionName === 'jump' || newActionName === 'death' ||
 				newActionName === 'walk_forward' || newActionName === 'shoot' ||
 				newActionName === 'walk_backward' || newActionName === 'walk_left' ||
 				newActionName === 'walk_right') {
 				newAction.loop = THREE.LoopOnce;
-				newAction.clampWhenFinished = true; // 停止在最后一帧
+				newAction.clampWhenFinished = true;
 			}
 
-			player.currentAction = newAction; // 设置新的活动动作
+			player.currentAction = newAction;
 
-			// 复位并淡入新动作
 			player.currentAction.reset();
-			player.currentAction.setEffectiveTimeScale(1);
+			if (newActionName === 'shoot')
+				player.currentAction.setEffectiveTimeScale(4);
+			else
+				player.currentAction.setEffectiveTimeScale(2);
 			player.currentAction.setEffectiveWeight(1);
 			player.currentAction.fadeIn(fadeDuration).play();
+		} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
+			//console.log("need to fire");
 		}
 	}
 
@@ -495,7 +492,6 @@
 		plane.rotation.x = -0.5 * Math.PI;
 		plane.position.y = -0;
 
-		//设置平面需要接收阴影
 		plane.receiveShadow = true;
 
 		scene.add(plane);
@@ -629,7 +625,7 @@
 					'walk_right']) &&
 			player.currentAction.time >= player.currentAction.getClip().duration
 		) {
-			console.log(player.id);
+			//console.log(player.id);
 			if (player.currentAction === player.actions['shoot'])
 				createBullet(player.model.position);
 			switchAction(player, 'idle', 0.1);
@@ -810,7 +806,7 @@
 
 	// keyborad control camera position
 	document.addEventListener("keydown", (event) => {
-		console.log(event);
+		//console.log(event);
 		let step = 0.01;
 		//ArrowLeft ArrowRight
 		switch (event.key) {
