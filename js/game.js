@@ -70,6 +70,7 @@
 	let monsterArr = [];
 	let wallArr = [];
 	let monsterDuration = 1000;
+	let monsterRadius = 0.06;
 	let innerWidth = document.querySelector("#model").clientWidth;
 	let innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
@@ -237,7 +238,7 @@
 		const geometry = new THREE.SphereGeometry(0.1, 50, 50);
 		//const material = new THREE.MeshBasicMaterial({ map: map });
 		const material = new THREE.MeshPhongMaterial({
-			color: 0xff0000, // 设置材质颜色
+			color: 0x0000ff, // 设置材质颜色
 			specular: 0xffffff, // 设置高光颜色
 			shininess: 100, // 设置高光强度
 			combine: THREE.MixOperation, // 设置环境映射的混合模式
@@ -254,28 +255,54 @@
 		bullet.speed = 0.5;
 		bullet.angle = 0;
 		bullet.distance = 0;
+		bullet.alive = true;
 		bulletArr.push(bullet)
 	}
 
-	function createMonster() {
-		const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-		//const material = new THREE.MeshBasicMaterial({ map: map });
+	function createMonster2() {
+		let r = monsterRadius;
+		let x = THREE.MathUtils.randFloatSpread(10) - 5;
+		let y = 1;
+		let z = THREE.MathUtils.randFloatSpread(100) + 20;
+		const geometry = new THREE.SphereGeometry(r, 10, 10);
+		// 创建材质
 		const material = new THREE.MeshPhongMaterial({
 			map: rockMap
 		});
-		let box = new THREE.Mesh(geometry, material);;
-		box.position.x = THREE.MathUtils.randFloatSpread(60) - 30;
-		box.position.y = 0.7;
-		box.position.z = THREE.MathUtils.randFloatSpread(100) + 20;
-		scene.add(box);
-		let monster = {};
-		monster.obj = box;
-		monster.speed = 0.1;
-		monster.angle = 0;
-		monster.distance = 0;
-		monster.alive = true;
-		monsterArr.push(monster);
-		setTimeout(createMonster, monsterDuration);
+		const group = new THREE.Group();
+		for (let i = -3; i <= 3; i++)
+			for (let j = -3; j <= 3; j++)
+				for (let m = -3; m <= 3; m++) {
+					if (Math.sqrt(i * i + j * j + m * m) > 3)
+						continue;
+
+					let ball = new THREE.Mesh(geometry, material)
+					ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
+					group.add(ball);
+				}
+		group.bom = false;
+		group.bomTimer = 0;
+		group.bomSpeed = 0.1;
+		group.alive = true;
+		group.speed = 0.1;
+		group.angle = 0;
+		group.distance = 0;
+		group.position.set(x, y, z);
+		scene.add(group);
+		monsterArr.push(group);
+		setTimeout(createMonster2, monsterDuration);
+	}
+
+	function bomMonster(monster) {
+		monster.traverse(function(obj) {
+			// 判断子对象是否是物体，如果是，更改其颜色
+			if (obj.isMesh) {
+				obj.material.color.set(0xff0000);
+			}
+		})
+		console.log(monster.position);
+		monster.bom = true;
+		monster.alive = false;
 	}
 
 
@@ -608,7 +635,7 @@
 	let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
 	let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
 	loadActions();
-	createMonster();
+	createMonster2();
 	setLight();
 	setHelper();
 	setControll();
@@ -707,39 +734,67 @@
 
 		let bulletList = [];
 		bulletArr.forEach(item => {
-			if (item.distance < 30)
+			if (item.alive && item.distance < 30)
 				bulletList.push(item);
 			else
 				scene.remove(item.obj)
 		});
 		bulletArr = bulletList;
 		bulletArr.forEach(item => {
-			let dx = item.speed * Math.sin(item.angle);
-			let dz = item.speed * Math.cos(item.angle);
-			item.obj.position.x += dx;
-			item.obj.position.z += dz;
-			item.distance += item.speed;
+			if (item.alive) {
+				let dx = item.speed * Math.sin(item.angle);
+				let dz = item.speed * Math.cos(item.angle);
+				item.obj.position.x += dx;
+				item.obj.position.z += dz;
+				item.distance += item.speed;
+			}
 		});
 
 		let monsterList = [];
 		monsterArr.forEach(item => {
-			if (item.alive && item.distance < 200) {
-				monsterList.push(item);
-			} else {
-				item.alive = false;
-				scene.remove(item.obj);
+			if (item.alive) {
+				if (item.distance < 200) {
+					monsterList.push(item);
+				} else {
+					scene.remove(item);
+				}
+			}
+			if (item.bom) {
+				if (item.bomTimer < 30) {
+					monsterList.push(item);
+				} else {
+					scene.remove(item);
+				}
 			}
 		});
 		monsterArr = monsterList;
 
 		monsterArr.forEach(item => {
-			let dx = item.speed * Math.sin(item.angle);
-			let dz = item.speed * Math.cos(item.angle);
-			item.obj.position.x += dx;
-			item.obj.position.z -= dz;
-			item.obj.rotation.x += 0.01;
-			item.obj.rotation.z += 0.01;
-			item.distance += item.speed;
+			if (item.alive) {
+				let dx = item.speed * Math.sin(item.angle);
+				let dz = item.speed * Math.cos(item.angle);
+				item.translateZ(-dz);
+				item.translateX(dx);
+				//item.rotation.x += 0.01;
+				//item.rotation.z += 0.01;
+				item.distance += item.speed;
+			}
+			if (item.bom) {
+				item.traverse(function(child) {
+					// 判断子对象是否是物体，如果是，更改其颜色
+					if (child.isMesh) {
+						let dir = new THREE.Vector3().copy(child.position.clone().normalize())
+						//console.log(dir);
+						let dx = dir.x * item.bomSpeed;
+						let dy = dir.y * item.bomSpeed;
+						let dz = dir.z * item.bomSpeed;
+						child.position.x += dx;
+						child.position.y += dy;
+						child.position.z += dz;
+					}
+				})
+				item.bomTimer += 1;
+			}
 		});
 
 		let delta = clock.getDelta();
@@ -757,29 +812,41 @@
 		let playerBox = new THREE.Box3().setFromObject(player1.model);
 		monsterArr.forEach(item => {
 			if (item.alive) {
-				let boxMeshBox = new THREE.Box3().setFromObject(item.obj);
+				let boxMeshBox = new THREE.Box3().setFromObject(item);
 				if (playerBox.intersectsBox(boxMeshBox)) {
 					player1.life -= 2;
-					item.alive = false;
+					bomMonster(item);
 				}
 				wallArr.forEach(wall => {
 					let wallMeshBox = new THREE.Box3().setFromObject(wall);
 					if (wallMeshBox.intersectsBox(boxMeshBox)) {
-						item.alive = false;
+						bomMonster(item);
 					}
 				})
 				bulletArr.forEach(bullet => {
 					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
-						item.alive = false;
+						bullet.alive =false;
+						bomMonster(item);
 					}
 				})
 			}
 
 		});
+		bulletArr.forEach(bullet => {
+			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
+			wallArr.forEach(wall => {
+				let wallMeshBox = new THREE.Box3().setFromObject(wall);
+				if (wallMeshBox.intersectsBox(bulletMeshBox)) {
+					bullet.alive = false;
+				}
+			})
+		})
+		
 		app.player1Life = player1.life;
 		uniforms.iTime.value += 0.05;
-		renderer.render(scene, camera);
+		renderer.render(scene,
+			camera);
 		requestAnimationFrame(animate);
 	}
 
