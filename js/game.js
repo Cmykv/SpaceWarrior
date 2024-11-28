@@ -15,7 +15,7 @@
 			textColor: '#0000ff',
 			showSetting: false,
 			cameraDistance: 3,
-			doublePlayer: false,
+			doublePlayer: true,
 			bones: [],
 			showOpts: false,
 			loaded: false,
@@ -77,6 +77,7 @@
 
 
 	let composer;
+	let outlinePass;
 	const textureLoader = new THREE.TextureLoader();
 	let rockMap = textureLoader.load("./lib/rock.png");
 	rockMap.wrapS = THREE.RepeatWrapping;
@@ -238,7 +239,7 @@
 		const geometry = new THREE.SphereGeometry(0.1, 50, 50);
 		//const material = new THREE.MeshBasicMaterial({ map: map });
 		const material = new THREE.MeshPhongMaterial({
-			color: 0x0000ff, // 设置材质颜色
+			color: 0xffffff, // 设置材质颜色
 			specular: 0xffffff, // 设置高光颜色
 			shininess: 100, // 设置高光强度
 			combine: THREE.MixOperation, // 设置环境映射的混合模式
@@ -248,7 +249,6 @@
 		sphere.position.x = pos.x + 0;
 		sphere.position.y = 1.3;
 		sphere.position.z = pos.z + 0.8;
-		//sphere.layers.set(1);
 		scene.add(sphere);
 		let bullet = {};
 		bullet.obj = sphere;
@@ -257,6 +257,11 @@
 		bullet.distance = 0;
 		bullet.alive = true;
 		bulletArr.push(bullet)
+		if(outlinePass)
+		{
+			outlinePass.selectedObjects.push(bullet.obj);
+		}
+		
 	}
 
 	function createMonster2() {
@@ -273,7 +278,7 @@
 		for (let i = -3; i <= 3; i++)
 			for (let j = -3; j <= 3; j++)
 				for (let m = -3; m <= 3; m++) {
-					if (Math.sqrt(i * i + j * j + m * m) > 3)
+					if (Math.sqrt(i * i + j * j + m * m) > 3.5)
 						continue;
 
 					let ball = new THREE.Mesh(geometry, material)
@@ -376,9 +381,9 @@
 
 	function setHelper() {
 		// helpers
-		const gridHelper = new THREE.GridHelper(50, 50);
-		gridHelper.receiveShadow = true;
-		scene.add(gridHelper);
+		//const gridHelper = new THREE.GridHelper(50, 50);
+		//gridHelper.receiveShadow = true;
+		//scene.add(gridHelper);
 
 		const axesHelper = new THREE.AxesHelper(50);
 		scene.add(axesHelper);
@@ -511,14 +516,24 @@
 
 	function setFloor() {
 		let planeGeometry = new THREE.PlaneGeometry(100, 100);
-		let planeMaterial = new THREE.MeshStandardMaterial({
-			color: 0x999999
-		});
+		let planeMaterial = new THREE.MeshPhongMaterial( { color: 0xFFFFFF } );
 
 		let plane = new THREE.Mesh(planeGeometry, planeMaterial);
 		plane.rotation.x = -0.5 * Math.PI;
 		plane.position.y = -0;
+		
+		textureLoader.load( './lib/grid.png', function ( texture ) {
+		
+						texture.colorSpace = THREE.SRGBColorSpace;
+						texture.wrapS = THREE.RepeatWrapping;
+						texture.wrapT = THREE.RepeatWrapping;
+						texture.repeat.set( 40, 40 );
+						plane.material.map = texture;
+						plane.material.needsUpdate = true;
+		
+		} );
 
+		plane.castShadow = true;
 		plane.receiveShadow = true;
 
 		scene.add(plane);
@@ -555,8 +570,9 @@
 
 
 	const renderer = new THREE.WebGLRenderer({
-		alpha: true,
+		//alpha: true,
 		antialias: true,
+		//logarithmicDepthBuffer: true
 	});
 	renderer.shadowMapEnabled = true;
 	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -564,14 +580,18 @@
 		document.querySelector("#model").clientWidth,
 		document.querySelector("#model").clientHeight
 	);
+	//renderer.autoClear = false;
 	renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
 	//ReinhardToneMapping
 	renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
 	//renderer.toneMapping = THREE.ReinhardToneMapping; // 色调映射
 	renderer.toneMappingExposure = 0.9; // 色调映射曝光
 	renderer.setPixelRatio(window.devicePixelRatio);
-	renderer.setClearColor(0x000000, 1); //设置背景颜色
+	//renderer.setClearColor(0x000000, 1); //设置背景颜色
 	document.querySelector("#model").appendChild(renderer.domElement);
+	const stats = new Stats();
+	stats.showPanel(0);
+	document.querySelector('#model').appendChild(stats.domElement);
 
 
 
@@ -586,31 +606,38 @@
 	);
 	camera.position.set(-1, 3, -10);
 	camera.lookAt(0, 0, 0);
-	const params = {
-		exposure: 0,
-		bloomStrength: 1.5,
-		bloomThreshold: 0,
-		bloomRadius: 0,
-	};
-	const initComposer = () => {
-		composer = new THREE.EffectComposer(renderer);
 
-		const renderScene = new THREE.RenderPass(scene, camera);
-		// 光晕
-		const bloomPass = new THREE.UnrealBloomPass(
-			new THREE.Vector2(document.querySelector("#model").clientWidth, document.querySelector(
-					"#model")
-				.clientHeight),
-			1.5,
-			0.4,
-			0.85
-		);
-		bloomPass.threshold = params.bloomThreshold;
-		bloomPass.strength = params.bloomStrength;
-		bloomPass.radius = params.bloomRadius;
-		composer.addPass(renderScene);
-		composer.addPass(bloomPass);
-	};
+	composer = new THREE.EffectComposer(renderer);
+	const renderPass = new THREE.RenderPass(scene, camera);
+	// 给EffectComposer添加一个渲染器通道 
+	composer.addPass(renderPass);
+	
+	let ssaoPass = new THREE.SSAOPass(scene, camera);
+	composer.addPass(ssaoPass);
+	ssaoPass.radius = 10;
+	ssaoPass.aoClamp = 0.25;
+	ssaoPass.lumInfluence = 0.6;
+
+	
+	const v2 = new THREE.Vector2(document.querySelector("#model").clientWidth,
+		document.querySelector("#model").clientHeight);
+	// OutlinePass第一个参数的尺寸和canvas画布保持一致
+	outlinePass = new THREE.OutlinePass(v2, scene, camera);
+	outlinePass.visibleEdgeColor.set(0xFFFFFF); // 可见边框颜色
+	outlinePass.hiddenEdgeColor.set(0x0000FF); // 隐藏边框颜色
+	outlinePass.edgeStrength = 5; // 高亮描边发光强度
+	outlinePass.edgeGlow = 0.1; // 光晕[0,1] 
+	outlinePass.edgeThickness = 2; // 高亮发光描边厚度(边缘宽度) 
+	outlinePass.pulsePeriod = 2; // 模型闪烁频率控制
+	outlinePass.renderToScreen = true; // 设置这个参数的目的是马上将当前的内容输出
+	// 将OutlinePass通道添加到后处理composer中
+	composer.addPass(outlinePass);
+
+	let gammaPass = new THREE.ShaderPass(THREE.GammaCorrectionShader);
+	gammaPass.renderToScreen = true;
+	composer.addPass(gammaPass);
+	outlinePass.selectedObjects = [];
+
 
 	window.addEventListener(
 		"resize",
@@ -634,12 +661,25 @@
 	setFloor();
 	let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
 	let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
+	console.log(player2.model);
+	//player2.model.material.color.set(0xff0000);
+	player2.model.traverse(function(obj) {
+		// 判断子对象是否是物体，如果是，更改其颜色
+		if (obj.isMesh) {
+			obj.material=new THREE.MeshPhongMaterial({
+			color: 0x0000ff, // 设置材质颜色
+			specular: 0xffffff, // 设置高光颜色
+			shininess: 100, // 设置高光强度
+			combine: THREE.MixOperation, // 设置环境映射的混合模式
+			reflectivity: 1 // 设置材质的反射强度
+		});
+		}
+	})
 	loadActions();
 	createMonster2();
 	setLight();
 	setHelper();
 	setControll();
-	initComposer();
 	createWall();
 
 	function handleActions(player) {
@@ -757,13 +797,15 @@
 					monsterList.push(item);
 				} else {
 					scene.remove(item);
+					item=null;
 				}
 			}
-			if (item.bom) {
+			if (item && item.bom) {
 				if (item.bomTimer < 30) {
 					monsterList.push(item);
 				} else {
 					scene.remove(item);
+					item=null;
 				}
 			}
 		});
@@ -826,7 +868,7 @@
 				bulletArr.forEach(bullet => {
 					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
-						bullet.alive =false;
+						bullet.alive = false;
 						bomMonster(item);
 					}
 				})
@@ -842,11 +884,14 @@
 				}
 			})
 		})
-		
+
 		app.player1Life = player1.life;
 		uniforms.iTime.value += 0.05;
-		renderer.render(scene,
-			camera);
+		stats.update();
+		
+		//composer.render()
+	
+		renderer.render(scene, camera)
 		requestAnimationFrame(animate);
 	}
 
