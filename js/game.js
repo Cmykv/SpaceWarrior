@@ -47,7 +47,7 @@ let app = new Vue({
 		textColor: '#0000ff',
 		showSetting: false,
 		cameraDistance: 3,
-		doublePlayer: true,
+		doublePlayer: false,
 		bones: [],
 		showOpts: false,
 		loaded: false,
@@ -106,6 +106,8 @@ let monsterRadius = 0.06;
 let innerWidth = document.querySelector("#model").clientWidth;
 let innerHeight = document.querySelector("#model").clientHeight;
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa0a0a0);
+//scene.fog = new THREE.Fog(0xa0a0a0, 500, 2000);
 
 
 let composer;
@@ -206,9 +208,9 @@ function setBackground() {
 		fragmentShader: fragmentShader,
 	});
 
-	const geometry = new THREE.PlaneGeometry(100, 100);
+	const geometry = new THREE.PlaneGeometry(5000, 5000);
 	const mesh = new THREE.Mesh(geometry, shaderMaterial);
-	mesh.position.set(0, 0, 20);
+	mesh.position.set(0, 0, 2000);
 	mesh.rotation.y = -Math.PI;
 	scene.add(mesh);
 }
@@ -225,37 +227,50 @@ function setControll() {
 }
 
 function setLight() {
-	const light = new THREE.AmbientLight(
-		0xffffff,
-		0.6
-	);
-	light.position.set(10.0, 10.0, 10.0).normalize();
-	scene.add(light);
-	let light2 = new THREE.DirectionalLight(
-		0xffffff,
-		1.5
-	);
-	light2.position.set(0, 3, -3);
-	light2.castShadow = true;
-	scene.add(light2);
+	
+	const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444, 5 );
+	hemiLight.position.set( 0, 500, 0 );
+	scene.add( hemiLight );
+	const hemiLightHelper = new THREE.HemisphereLightHelper( hemiLight, 10 );
+	scene.add( hemiLightHelper );
+	
+	const dirLight = new THREE.DirectionalLight( 0xffffff, 5 );
+	dirLight.color.setHSL( 0.1, 1, 0.95 );
+	dirLight.position.set( 0, 500, 300 );
+	dirLight.castShadow = true;
+	dirLight.shadow.mapSize.width = 500;
+	dirLight.shadow.mapSize.height = 500;
+	let d=500;
+	dirLight.shadow.camera.left = - d;
+	dirLight.shadow.camera.right = d;
+	dirLight.shadow.camera.top = d;
+	dirLight.shadow.camera.bottom = - d;
+	
+	dirLight.shadow.camera.far = 3500;
+	dirLight.shadow.bias = - 0.0001;
+	
+	const dirLightHelper = new THREE.DirectionalLightHelper( dirLight, 10 );
+	scene.add( dirLightHelper );
+	scene.add( dirLight );
 
 }
 
 function createWall() {
-	for (let i = 0; i < 3; i++) {
-		let cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
+	for (let i = 0; i < 2; i++) {
+		let cubeGeometry = new THREE.BoxGeometry(100, 200, 100);
 		let cubeMaterial = new THREE.MeshLambertMaterial({
 			color: 0x2a0000
 		});
 
 		let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-		cube.position.x = THREE.MathUtils.randFloatSpread(30);
-		cube.position.y = 0.5;
-		cube.position.z = THREE.MathUtils.randFloatSpread(30);
+		//THREE.MathUtils.randFloatSpread(1000)
+		cube.position.x = 500*(i>0?1:-1);
+		cube.position.y = 100;
+		cube.position.z = 300;
 		//cube.layers.set(1);
 		//告诉立方体需要投射阴影
 		cube.castShadow = true;
-
+		cube.receiveShadow = true;
 		scene.add(cube);
 		wallArr.push(cube);
 	}
@@ -353,7 +368,6 @@ function loadAvatar(player, pos) {
 				if (theModel.type == "fbx") {
 					model = gltf;
 					player.model = model;
-					player.model.scale.set(0.01, 0.01, 0.01);
 				}
 				player.model.position.set(pos.x, pos.y, pos.z);
 				player.skeletonHelper = new THREE.SkeletonHelper(player.model);
@@ -365,6 +379,7 @@ function loadAvatar(player, pos) {
 				player.model.castShadow = true;
 				player.model.children.forEach(child => {
 					child.castShadow = true;
+					child.receiveShadow = true;
 				});
 				scene.add(player.model);
 				player.avatarRotY = player.model.rotation.y;
@@ -412,7 +427,7 @@ function setHelper() {
 	//gridHelper.receiveShadow = true;
 	//scene.add(gridHelper);
 
-	const axesHelper = new THREE.AxesHelper(50);
+	const axesHelper = new THREE.AxesHelper(500);
 	scene.add(axesHelper);
 }
 
@@ -542,30 +557,14 @@ function switchAction(player, newActionName, fadeDuration = 0.1) {
 }
 
 function setFloor() {
-	let planeGeometry = new THREE.PlaneGeometry(100, 100);
-	let planeMaterial = new THREE.MeshPhongMaterial({
-		color: 0xFFFFFF
-	});
-
-	let plane = new THREE.Mesh(planeGeometry, planeMaterial);
-	plane.rotation.x = -0.5 * Math.PI;
-	plane.position.y = -0;
-
-	textureLoader.load('./lib/grid.png', function(texture) {
-
-		texture.colorSpace = THREE.SRGBColorSpace;
-		texture.wrapS = THREE.RepeatWrapping;
-		texture.wrapT = THREE.RepeatWrapping;
-		texture.repeat.set(40, 40);
-		plane.material.map = texture;
-		plane.material.needsUpdate = true;
-
-	});
-
-	plane.castShadow = true;
-	plane.receiveShadow = true;
-
-	scene.add(plane);
+	const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 4000, 4000 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+	mesh.rotation.x = - Math.PI / 2;
+	mesh.receiveShadow = true;
+	scene.add( mesh );
+	const grid = new THREE.GridHelper( 4000, 20, 0x000000, 0x000000 );
+	grid.material.opacity = 0.2;
+	grid.material.transparent = true;
+	scene.add( grid );
 }
 
 
@@ -599,21 +598,21 @@ function toggleShow(k, obj) {
 
 
 const renderer = new THREE.WebGLRenderer({
-	//alpha: true,
-	antialias: true,
-	//logarithmicDepthBuffer: true
+	antialias: true
 });
-renderer.shadowMapEnabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(
 	document.querySelector("#model").clientWidth,
 	document.querySelector("#model").clientHeight
 );
+renderer.shadowMap.enabled = true;
+
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 //renderer.autoClear = false;
 renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
 //ReinhardToneMapping
 renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
-//renderer.toneMapping = THREE.ReinhardToneMapping; // 色调映射
 renderer.toneMappingExposure = 0.9; // 色调映射曝光
 renderer.setPixelRatio(window.devicePixelRatio);
 //renderer.setClearColor(0x000000, 1); //设置背景颜色
@@ -630,10 +629,10 @@ const camera = new THREE.PerspectiveCamera(
 	50,
 	document.querySelector("#model").clientWidth /
 	document.querySelector("#model").clientHeight,
-	0.1,
-	50.0
+	1,
+	5000.0
 );
-camera.position.set(-1, 3, -10);
+camera.position.set(0, 200, -1000);
 camera.lookAt(0, 0, 0);
 
 composer = new EffectComposer(renderer);
@@ -682,10 +681,9 @@ window.addEventListener(
 
 setBackground();
 setFloor();
-let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
-let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
-console.log(player2.model);
-//player2.model.material.color.set(0xff0000);
+let a = await loadAvatar(player1, new THREE.Vector3(-100, 0, 0));
+let b = await loadAvatar(player2, new THREE.Vector3(100, 0, 0));
+if (!app.doublePlayer) player2.model.visible = false;
 player2.model.traverse(function(obj) {
 	// 判断子对象是否是物体，如果是，更改其颜色
 	if (obj.isMesh) {
@@ -699,7 +697,7 @@ player2.model.traverse(function(obj) {
 	}
 })
 loadActions();
-createMonster2();
+//createMonster2();
 setLight();
 setHelper();
 setControll();
@@ -735,7 +733,7 @@ function handleActions(player) {
 			}
 		})
 		if (canMove) {
-			let dz = 0.03;
+			let dz = 2;
 			player.model.position.z += dz;
 			player.circle.position.z = player.model.position.z;
 		}
@@ -752,7 +750,7 @@ function handleActions(player) {
 			}
 		})
 		if (canMove) {
-			let dz = -0.03;
+			let dz = -2;
 			player.model.position.z += dz;
 			player.circle.position.z = player.model.position.z;
 		}
@@ -769,7 +767,7 @@ function handleActions(player) {
 			}
 		})
 		if (canMove) {
-			let dx = 0.03;
+			let dx = 2;
 			player.model.position.x += dx;
 			player.circle.position.x = player.model.position.x;
 		}
@@ -786,7 +784,7 @@ function handleActions(player) {
 			}
 		})
 		if (canMove) {
-			let dx = -0.03;
+			let dx = -2;
 			player.model.position.x += dx;
 			player.circle.position.x = player.model.position.x;
 		}
@@ -866,7 +864,7 @@ function animate() {
 	if (player1.animationMixer != null) {
 		player1.animationMixer.update(delta);
 	}
-	if (player2.animationMixer != null) {
+	if (app.doublePlayer && player2.animationMixer != null) {
 		player2.animationMixer.update(delta);
 	}
 	handleActions(player1);
