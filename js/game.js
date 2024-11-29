@@ -765,7 +765,7 @@ function init() {
 			if (canMove) {
 				let dz = 2;
 				player.model.position.z += dz;
-				player.circle.position.z = player.model.position.z;
+				player.foot.position.z = player.model.position.z;
 			}
 		}
 		if (
@@ -782,7 +782,7 @@ function init() {
 			if (canMove) {
 				let dz = -2;
 				player.model.position.z += dz;
-				player.circle.position.z = player.model.position.z;
+				player.foot.position.z = player.model.position.z;
 			}
 		}
 		if (
@@ -799,7 +799,7 @@ function init() {
 			if (canMove) {
 				let dx = 2;
 				player.model.position.x += dx;
-				player.circle.position.x = player.model.position.x;
+				player.foot.position.x = player.model.position.x;
 			}
 		}
 		if (
@@ -816,7 +816,7 @@ function init() {
 			if (canMove) {
 				let dx = -2;
 				player.model.position.x += dx;
-				player.circle.position.x = player.model.position.x;
+				player.foot.position.x = player.model.position.x;
 			}
 		}
 	}
