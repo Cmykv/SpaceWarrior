@@ -1,113 +1,141 @@
-(async () => {
-	const theModel = {
-		"name": "Vanguard",
-		"path": "model/Vanguard.fbx",
-		"type": "fbx",
-		"isBuildIn": true,
-		"picBg": "model/Vanguard.png"
-	};
-	let app = new Vue({
-		el: "#vue-target",
-		data: {
-			model: theModel,
-			color: '#ff0000',
-			bgcolor: '#ffffff',
-			textColor: '#0000ff',
-			showSetting: false,
-			cameraDistance: 3,
-			doublePlayer: true,
-			bones: [],
-			showOpts: false,
-			loaded: false,
-			failed: false,
-			failedText: "Load failed",
-			player1Score: 0,
-			player1Life: 100
-		},
-	});
-	let player1 = {
-		id: 1,
-		model: null,
-		avatarRotY: 0,
-		currentActionName: "idle",
-		currentAction: null,
-		previousAction: null,
-		skeletonHelper: null,
-		actions: [],
-		animationMixer: null,
-		score: 0,
-		life: 100,
-		foot: null
-	};
-	let player2 = {
-		id: 2,
-		model: null,
-		avatarRotY: 0,
-		currentActionName: "idle",
-		currentAction: null,
-		previousAction: null,
-		skeletonHelper: null,
-		actions: [],
-		animationMixer: null,
-		score: 0,
-		life: 100,
-		foot: null
-	};
-	const uniforms = {
-		iTime: {
-			value: 0
-		},
-		iResolution: {
-			value: new THREE.Vector2(window.innerWidth, window.innerHeight)
-		}
-	};
+import * as THREE from 'three';
 
+import Stats from 'three/addons/libs/stats.module.js';
 
-	let clock = new THREE.Clock();
-	// gltf and vrm
-	let loader = null;
-	let bulletArr = [];
-	let monsterArr = [];
-	let wallArr = [];
-	let monsterDuration = 1000;
-	let monsterRadius = 0.06;
-	let innerWidth = document.querySelector("#model").clientWidth;
-	let innerHeight = document.querySelector("#model").clientHeight;
-	const scene = new THREE.Scene();
+import {
+	OrbitControls
+} from 'three/addons/controls/OrbitControls.js';
+import {
+	FBXLoader
+} from 'three/addons/loaders/FBXLoader.js';
+import {
+	GUI
+} from 'three/addons/libs/lil-gui.module.min.js';
 
+import {
+	EffectComposer
+} from 'three/addons/postprocessing/EffectComposer.js';
+import {
+	RenderPass
+} from 'three/addons/postprocessing/RenderPass.js';
+import {
+	ShaderPass
+} from 'three/addons/postprocessing/ShaderPass.js';
+import {
+	OutlinePass
+} from 'three/addons/postprocessing/OutlinePass.js';
+import {
+	OutputPass
+} from 'three/addons/postprocessing/OutputPass.js';
+import {
+	FXAAShader
+} from 'three/addons/shaders/FXAAShader.js';
 
-	let composer;
-	let outlinePass;
-	const textureLoader = new THREE.TextureLoader();
-	let rockMap = textureLoader.load("./lib/rock.png");
-	rockMap.wrapS = THREE.RepeatWrapping;
-	rockMap.wrapT = THREE.RepeatWrapping;
-	document.getElementById("btn_set").onclick = () => {
-		if (!app.showSetting) {
-			gui.show();
-		} else {
-			gui.hide();
-		}
-		app.showSetting = !app.showSetting
+const theModel = {
+	"name": "Vanguard",
+	"path": "model/Vanguard.fbx",
+	"type": "fbx",
+	"isBuildIn": true,
+	"picBg": "model/Vanguard.png"
+};
+let app = new Vue({
+	el: "#vue-target",
+	data: {
+		model: theModel,
+		color: '#ff0000',
+		bgcolor: '#ffffff',
+		textColor: '#0000ff',
+		showSetting: false,
+		cameraDistance: 3,
+		doublePlayer: true,
+		bones: [],
+		showOpts: false,
+		loaded: false,
+		failed: false,
+		failedText: "Load failed",
+		player1Score: 0,
+		player1Life: 100
+	},
+});
+let player1 = {
+	id: 1,
+	model: null,
+	avatarRotY: 0,
+	currentActionName: "idle",
+	currentAction: null,
+	previousAction: null,
+	skeletonHelper: null,
+	actions: [],
+	animationMixer: null,
+	score: 0,
+	life: 100,
+	foot: null
+};
+let player2 = {
+	id: 2,
+	model: null,
+	avatarRotY: 0,
+	currentActionName: "idle",
+	currentAction: null,
+	previousAction: null,
+	skeletonHelper: null,
+	actions: [],
+	animationMixer: null,
+	score: 0,
+	life: 100,
+	foot: null
+};
+const uniforms = {
+	iTime: {
+		value: 0
+	},
+	iResolution: {
+		value: new THREE.Vector2(window.innerWidth, window.innerHeight)
 	}
+};
 
-	let modal = document.getElementById("myModal");
-	document.getElementById("btn_start").onclick = () => {
-		modal.style.display = "none";
-	}
-	/*
-	span.onclick = function() {
-	  modal.style.display = "none";
-	}
-	*/
 
-	const vertexShader = `
+let clock = new THREE.Clock();
+// gltf and vrm
+let loader = null;
+let bulletArr = [];
+let monsterArr = [];
+let wallArr = [];
+let monsterDuration = 1000;
+let monsterRadius = 0.06;
+let innerWidth = document.querySelector("#model").clientWidth;
+let innerHeight = document.querySelector("#model").clientHeight;
+const scene = new THREE.Scene();
+
+
+let composer;
+let outlinePass;
+const textureLoader = new THREE.TextureLoader();
+let rockMap = textureLoader.load("./lib/rock.png");
+rockMap.wrapS = THREE.RepeatWrapping;
+rockMap.wrapT = THREE.RepeatWrapping;
+document.getElementById("btn_set").onclick = () => {
+	if (!app.showSetting) {
+		gui.show();
+	} else {
+		gui.hide();
+	}
+	app.showSetting = !app.showSetting
+}
+
+let modal = document.getElementById("myModal");
+document.getElementById("btn_start").onclick = () => {
+	modal.style.display = "none";
+}
+
+
+const vertexShader = `
    void main() {
        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
    }
    `;
 
-	const fragmentShader = `
+const fragmentShader = `
    uniform float iTime;
    uniform vec2 iResolution;
    int iterations=17;
@@ -169,805 +197,780 @@
    `;
 
 
-	function setBackground() {
+function setBackground() {
 
 
-		const shaderMaterial = new THREE.ShaderMaterial({
-			uniforms: uniforms,
-			vertexShader: vertexShader,
-			fragmentShader: fragmentShader,
-		});
-
-		const geometry = new THREE.PlaneBufferGeometry(100, 100);
-		const mesh = new THREE.Mesh(geometry, shaderMaterial);
-		mesh.position.set(0, 0, 20);
-		mesh.rotation.y = -Math.PI;
-		scene.add(mesh);
-	}
-
-	function setControll() {
-		const controls = new THREE.OrbitControls(
-			camera,
-			renderer.domElement
-		);
-		controls.screenSpacePanning = true;
-		controls.target.set(0.0, 1.0, 0.0);
-		controls.update();
-
-	}
-
-	function setLight() {
-		const light = new THREE.AmbientLight(
-			0xffffff,
-			0.6
-		);
-		light.position.set(10.0, 10.0, 10.0).normalize();
-		scene.add(light);
-		let light2 = new THREE.DirectionalLight(
-			0xffffff,
-			1.5
-		);
-		light2.position.set(0, 3, -3);
-		light2.castShadow = true;
-		scene.add(light2);
-
-	}
-
-	function createWall() {
-		for (let i = 0; i < 3; i++) {
-			cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
-			cubeMaterial = new THREE.MeshLambertMaterial({
-				color: 0x2a0000
-			});
-
-			cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-			cube.position.x = THREE.MathUtils.randFloatSpread(30);
-			cube.position.y = 0.5;
-			cube.position.z = THREE.MathUtils.randFloatSpread(30);
-			//cube.layers.set(1);
-			//告诉立方体需要投射阴影
-			cube.castShadow = true;
-
-			scene.add(cube);
-			wallArr.push(cube);
-		}
-	}
-
-
-
-	function createBullet(pos) {
-		const geometry = new THREE.SphereGeometry(0.1, 50, 50);
-		//const material = new THREE.MeshBasicMaterial({ map: map });
-		const material = new THREE.MeshPhongMaterial({
-			color: 0xffffff, // 设置材质颜色
-			specular: 0xffffff, // 设置高光颜色
-			shininess: 100, // 设置高光强度
-			combine: THREE.MixOperation, // 设置环境映射的混合模式
-			reflectivity: 3 // 设置材质的反射强度
-		});
-		let sphere = new THREE.Mesh(geometry, material);;
-		sphere.position.x = pos.x + 0;
-		sphere.position.y = 1.3;
-		sphere.position.z = pos.z + 0.8;
-		scene.add(sphere);
-		let bullet = {};
-		bullet.obj = sphere;
-		bullet.speed = 0.5;
-		bullet.angle = 0;
-		bullet.distance = 0;
-		bullet.alive = true;
-		bulletArr.push(bullet)
-		if(outlinePass)
-		{
-			outlinePass.selectedObjects.push(bullet.obj);
-		}
-		
-	}
-
-	function createMonster2() {
-		let r = monsterRadius;
-		let x = THREE.MathUtils.randFloatSpread(10) - 5;
-		let y = 1;
-		let z = THREE.MathUtils.randFloatSpread(100) + 20;
-		const geometry = new THREE.SphereGeometry(r, 10, 10);
-		// 创建材质
-		const material = new THREE.MeshPhongMaterial({
-			map: rockMap
-		});
-		const group = new THREE.Group();
-		for (let i = -3; i <= 3; i++)
-			for (let j = -3; j <= 3; j++)
-				for (let m = -3; m <= 3; m++) {
-					if (Math.sqrt(i * i + j * j + m * m) > 3.5)
-						continue;
-
-					let ball = new THREE.Mesh(geometry, material)
-					ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
-					group.add(ball);
-				}
-		group.bom = false;
-		group.bomTimer = 0;
-		group.bomSpeed = 0.1;
-		group.alive = true;
-		group.speed = 0.1;
-		group.angle = 0;
-		group.distance = 0;
-		group.position.set(x, y, z);
-		scene.add(group);
-		monsterArr.push(group);
-		setTimeout(createMonster2, monsterDuration);
-	}
-
-	function bomMonster(monster) {
-		monster.traverse(function(obj) {
-			// 判断子对象是否是物体，如果是，更改其颜色
-			if (obj.isMesh) {
-				obj.material.color.set(0xff0000);
-			}
-		})
-		console.log(monster.position);
-		monster.bom = true;
-		monster.alive = false;
-	}
-
-
-	function loadAvatar(player, pos) {
-		return new Promise((resolve, reject) => {
-			if (theModel.type == "fbx") {
-				loader = new THREE.FBXLoader();
-			} else {
-				loader = new THREE.GLTFLoader();
-			}
-			loader.crossOrigin = "anonymous";
-			loader.load(
-				theModel.path,
-				(gltf) => {
-					let model = null;
-					if (theModel.type == "fbx") {
-						model = gltf;
-						player.model = model;
-						player.model.scale.set(0.01, 0.01, 0.01);
-					}
-					player.model.position.set(pos.x, pos.y, pos.z);
-					player.skeletonHelper = new THREE.SkeletonHelper(player.model);
-					player.skeletonHelper.visible = false;
-					player.skeletonHelper.material.linewidth = 30;
-
-					scene.add(player.skeletonHelper);
-
-					player.model.castShadow = true;
-					player.model.children.forEach(child => {
-						child.castShadow = true;
-					});
-					scene.add(player.model);
-					player.avatarRotY = player.model.rotation.y;
-
-					const geometry = new THREE.CircleGeometry(0.6, 32, 0, Math.PI * 2);
-					let color = player.id == 1 ? 0xff0000 : 0x0000ff;
-					const material = new THREE.MeshBasicMaterial({
-						color: color,
-						side: THREE.DoubleSide,
-						transparent: true,
-						opacity: 0.4
-					});
-					const circle = new THREE.Mesh(geometry, material);
-					circle.position.y = 0.1;
-					circle.position.x = pos.x;
-					circle.position.z = pos.z;
-					circle.rotation.x = Math.PI / 2;
-					player.circle = circle;
-					scene.add(circle);
-
-
-					resolve(1)
-				},
-
-				// called while loading is progressing
-				(progress) =>
-				console.log(
-					"Loading model...", 100.0 * (progress.loaded / progress.total), "%"
-				),
-
-				// called when loading has errors
-				(error) => {
-					reject(1);
-					app.failed = true;
-					console.log(error);
-				}
-			);
-		});
-
-	}
-
-	function setHelper() {
-		// helpers
-		//const gridHelper = new THREE.GridHelper(50, 50);
-		//gridHelper.receiveShadow = true;
-		//scene.add(gridHelper);
-
-		const axesHelper = new THREE.AxesHelper(50);
-		scene.add(axesHelper);
-	}
-
-	function getCenter(obj) {
-		const selectedDecorationBbox = new THREE.Box3().setFromObject(obj);
-		let center = new THREE.Vector3();
-		let midPoint = selectedDecorationBbox.getCenter(center);
-	}
-
-	function loadActions() {
-		let loader = new THREE.FBXLoader();
-		player1.animationMixer = new THREE.AnimationMixer(player1.model);
-		player2.animationMixer = new THREE.AnimationMixer(player2.model);
-		loader.load('./model/walkforward.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				player1.actions["walk_forward"] = player1.animationMixer.clipAction(clip);
-				player2.actions["walk_forward"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		loader.load('./model/walkbackward.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				player1.actions["walk_backward"] = player1.animationMixer.clipAction(clip);
-				player2.actions["walk_backward"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		loader.load('./model/walkleft.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				//actions["walk_left"] = animationMixer.clipAction(clip);
-				player1.actions["walk_left"] = player1.animationMixer.clipAction(clip);
-				player2.actions["walk_left"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		loader.load('./model/walkright.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				//actions["walk_right"] = animationMixer.clipAction(clip);
-				player1.actions["walk_right"] = player1.animationMixer.clipAction(clip);
-				player2.actions["walk_right"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		loader.load('./model/idle.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				//actions["idle"] = animationMixer.clipAction(clip);
-				player1.actions["idle"] = player1.animationMixer.clipAction(clip);
-				player2.actions["idle"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-
-		loader.load('./model/jumping.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				//actions["jump"] = animationMixer.clipAction(clip);
-				player1.actions["jump"] = player1.animationMixer.clipAction(clip);
-				player2.actions["jump"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		loader.load('./model/shooting.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				//actions["shoot"] = animationMixer.clipAction(clip);
-				player1.actions["shoot"] = player1.animationMixer.clipAction(clip);
-				player2.actions["shoot"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		loader.load('./model/death.fbx', function(gltf) {
-			gltf.animations.forEach((clip) => {
-				//console.log(clip)
-				//actions["death"] = animationMixer.clipAction(clip);
-				player1.actions["death"] = player1.animationMixer.clipAction(clip);
-				player2.actions["death"] = player2.animationMixer.clipAction(clip);
-			});
-
-		});
-		setTimeout(() => {
-			app.loaded = true;
-			console.log(player1.actions["shoot"]);
-			player1.actions["idle"].play();
-			player2.actions["idle"].play();
-			player1.currentAction = player1.actions["idle"];
-			player1.currentActionName = "idle";
-			player2.currentAction = player2.actions["idle"];
-			player2.currentActionName = "idle";
-		}, 3000)
-
-	}
-
-	function switchAction(player, newActionName, fadeDuration = 0.1) {
-		console.log("switch to action " + newActionName, player.id)
-		const newAction = player.actions[newActionName];
-		if (newAction && player.currentAction !== newAction) {
-			player.previousAction = player.currentAction;
-			if (player.previousAction) {
-				player.previousAction.fadeOut(fadeDuration);
-			}
-
-			if (newActionName === 'jump' || newActionName === 'death' ||
-				newActionName === 'walk_forward' || newActionName === 'shoot' ||
-				newActionName === 'walk_backward' || newActionName === 'walk_left' ||
-				newActionName === 'walk_right') {
-				newAction.loop = THREE.LoopOnce;
-				newAction.clampWhenFinished = true;
-			}
-
-			player.currentAction = newAction;
-
-			player.currentAction.reset();
-			if (newActionName === 'shoot')
-				player.currentAction.setEffectiveTimeScale(4);
-			else
-				player.currentAction.setEffectiveTimeScale(2);
-			player.currentAction.setEffectiveWeight(1);
-			player.currentAction.fadeIn(fadeDuration).play();
-		} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
-			//console.log("need to fire");
-		}
-	}
-
-	function setFloor() {
-		let planeGeometry = new THREE.PlaneGeometry(100, 100);
-		let planeMaterial = new THREE.MeshPhongMaterial( { color: 0xFFFFFF } );
-
-		let plane = new THREE.Mesh(planeGeometry, planeMaterial);
-		plane.rotation.x = -0.5 * Math.PI;
-		plane.position.y = -0;
-		
-		textureLoader.load( './lib/grid.png', function ( texture ) {
-		
-						texture.colorSpace = THREE.SRGBColorSpace;
-						texture.wrapS = THREE.RepeatWrapping;
-						texture.wrapT = THREE.RepeatWrapping;
-						texture.repeat.set( 40, 40 );
-						plane.material.map = texture;
-						plane.material.needsUpdate = true;
-		
-		} );
-
-		plane.castShadow = true;
-		plane.receiveShadow = true;
-
-		scene.add(plane);
-	}
-
-
-
-	function toggleShow(k, obj) {
-		console.log(k);
-		if (
-			obj
-			.querySelector(".mdui-list-item-content")
-			.innerText.includes('hide')
-		) {
-			scene.getObjectByName(k).visible = false;
-			obj.querySelector(".mdui-list-item-content").innerText =
-				'show' +
-				obj
-				.querySelector(".mdui-list-item-content")
-				.innerText.substr(
-					'hide'.length
-				);
-		} else {
-			scene.getObjectByName(k).visible = true;
-			obj.querySelector(".mdui-list-item-content").innerText =
-				'hide' +
-				obj
-				.querySelector(".mdui-list-item-content")
-				.innerText.substr(
-					'show'.length
-				);
-		}
-	}
-
-
-	const renderer = new THREE.WebGLRenderer({
-		//alpha: true,
-		antialias: true,
-		//logarithmicDepthBuffer: true
+	const shaderMaterial = new THREE.ShaderMaterial({
+		uniforms: uniforms,
+		vertexShader: vertexShader,
+		fragmentShader: fragmentShader,
 	});
-	renderer.shadowMapEnabled = true;
-	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-	renderer.setSize(
-		document.querySelector("#model").clientWidth,
-		document.querySelector("#model").clientHeight
+
+	const geometry = new THREE.PlaneGeometry(100, 100);
+	const mesh = new THREE.Mesh(geometry, shaderMaterial);
+	mesh.position.set(0, 0, 20);
+	mesh.rotation.y = -Math.PI;
+	scene.add(mesh);
+}
+
+function setControll() {
+	const controls = new OrbitControls(
+		camera,
+		renderer.domElement
 	);
-	//renderer.autoClear = false;
-	renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
-	//ReinhardToneMapping
-	renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
-	//renderer.toneMapping = THREE.ReinhardToneMapping; // 色调映射
-	renderer.toneMappingExposure = 0.9; // 色调映射曝光
-	renderer.setPixelRatio(window.devicePixelRatio);
-	//renderer.setClearColor(0x000000, 1); //设置背景颜色
-	document.querySelector("#model").appendChild(renderer.domElement);
-	const stats = new Stats();
-	stats.showPanel(0);
-	document.querySelector('#model').appendChild(stats.domElement);
+	controls.screenSpacePanning = true;
+	controls.target.set(0.0, 1.0, 0.0);
+	controls.update();
 
+}
 
-
-
-	// camera
-	const camera = new THREE.PerspectiveCamera(
-		50,
-		document.querySelector("#model").clientWidth /
-		document.querySelector("#model").clientHeight,
-		0.1,
-		50.0
+function setLight() {
+	const light = new THREE.AmbientLight(
+		0xffffff,
+		0.6
 	);
-	camera.position.set(-1, 3, -10);
-	camera.lookAt(0, 0, 0);
-
-	composer = new THREE.EffectComposer(renderer);
-	const renderPass = new THREE.RenderPass(scene, camera);
-	// 给EffectComposer添加一个渲染器通道 
-	composer.addPass(renderPass);
-	
-	let ssaoPass = new THREE.SSAOPass(scene, camera);
-	composer.addPass(ssaoPass);
-	ssaoPass.radius = 10;
-	ssaoPass.aoClamp = 0.25;
-	ssaoPass.lumInfluence = 0.6;
-
-	
-	const v2 = new THREE.Vector2(document.querySelector("#model").clientWidth,
-		document.querySelector("#model").clientHeight);
-	// OutlinePass第一个参数的尺寸和canvas画布保持一致
-	outlinePass = new THREE.OutlinePass(v2, scene, camera);
-	outlinePass.visibleEdgeColor.set(0xFFFFFF); // 可见边框颜色
-	outlinePass.hiddenEdgeColor.set(0x0000FF); // 隐藏边框颜色
-	outlinePass.edgeStrength = 5; // 高亮描边发光强度
-	outlinePass.edgeGlow = 0.1; // 光晕[0,1] 
-	outlinePass.edgeThickness = 2; // 高亮发光描边厚度(边缘宽度) 
-	outlinePass.pulsePeriod = 2; // 模型闪烁频率控制
-	outlinePass.renderToScreen = true; // 设置这个参数的目的是马上将当前的内容输出
-	// 将OutlinePass通道添加到后处理composer中
-	composer.addPass(outlinePass);
-
-	let gammaPass = new THREE.ShaderPass(THREE.GammaCorrectionShader);
-	gammaPass.renderToScreen = true;
-	composer.addPass(gammaPass);
-	outlinePass.selectedObjects = [];
-
-
-	window.addEventListener(
-		"resize",
-		function() {
-			camera.aspect =
-				document.querySelector("#model").clientWidth /
-				document.querySelector("#model").clientHeight;
-			camera.updateProjectionMatrix();
-			renderer.setSize(
-				document.querySelector("#model").clientWidth,
-				document.querySelector("#model").clientHeight
-			);
-		},
-		false
+	light.position.set(10.0, 10.0, 10.0).normalize();
+	scene.add(light);
+	let light2 = new THREE.DirectionalLight(
+		0xffffff,
+		1.5
 	);
+	light2.position.set(0, 3, -3);
+	light2.castShadow = true;
+	scene.add(light2);
+
+}
+
+function createWall() {
+	for (let i = 0; i < 3; i++) {
+		let cubeGeometry = new THREE.BoxGeometry(1, 4, 1);
+		let cubeMaterial = new THREE.MeshLambertMaterial({
+			color: 0x2a0000
+		});
+
+		let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+		cube.position.x = THREE.MathUtils.randFloatSpread(30);
+		cube.position.y = 0.5;
+		cube.position.z = THREE.MathUtils.randFloatSpread(30);
+		//cube.layers.set(1);
+		//告诉立方体需要投射阴影
+		cube.castShadow = true;
+
+		scene.add(cube);
+		wallArr.push(cube);
+	}
+}
 
 
-	// scene
 
-	setBackground();
-	setFloor();
-	let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
-	let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
-	console.log(player2.model);
-	//player2.model.material.color.set(0xff0000);
-	player2.model.traverse(function(obj) {
+function createBullet(pos) {
+	const geometry = new THREE.SphereGeometry(0.1, 50, 50);
+	//const material = new THREE.MeshBasicMaterial({ map: map });
+	const material = new THREE.MeshPhongMaterial({
+		color: 0xffffff, // 设置材质颜色
+		specular: 0xffffff, // 设置高光颜色
+		shininess: 100, // 设置高光强度
+		combine: THREE.MixOperation, // 设置环境映射的混合模式
+		reflectivity: 3 // 设置材质的反射强度
+	});
+	let sphere = new THREE.Mesh(geometry, material);;
+	sphere.position.x = pos.x + 0;
+	sphere.position.y = 1.3;
+	sphere.position.z = pos.z + 0.8;
+	scene.add(sphere);
+	let bullet = {};
+	bullet.obj = sphere;
+	bullet.speed = 0.5;
+	bullet.angle = 0;
+	bullet.distance = 0;
+	bullet.alive = true;
+	bulletArr.push(bullet)
+	if (outlinePass) {
+		outlinePass.selectedObjects.push(bullet.obj);
+	}
+
+}
+
+function createMonster2() {
+	let r = monsterRadius;
+	let x = THREE.MathUtils.randFloatSpread(10) - 5;
+	let y = 1;
+	let z = THREE.MathUtils.randFloatSpread(100) + 20;
+	const geometry = new THREE.SphereGeometry(r, 10, 10);
+	// 创建材质
+	const material = new THREE.MeshPhongMaterial({
+		map: rockMap
+	});
+	const group = new THREE.Group();
+	for (let i = -3; i <= 3; i++)
+		for (let j = -3; j <= 3; j++)
+			for (let m = -3; m <= 3; m++) {
+				if (Math.sqrt(i * i + j * j + m * m) > 3.5)
+					continue;
+
+				let ball = new THREE.Mesh(geometry, material)
+				ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
+				group.add(ball);
+			}
+	group.bom = false;
+	group.bomTimer = 0;
+	group.bomSpeed = 0.1;
+	group.alive = true;
+	group.speed = 0.1;
+	group.angle = 0;
+	group.distance = 0;
+	group.position.set(x, y, z);
+	scene.add(group);
+	monsterArr.push(group);
+	setTimeout(createMonster2, monsterDuration);
+}
+
+function bomMonster(monster) {
+	monster.traverse(function(obj) {
 		// 判断子对象是否是物体，如果是，更改其颜色
 		if (obj.isMesh) {
-			obj.material=new THREE.MeshPhongMaterial({
+			obj.material.color.set(0xff0000);
+		}
+	})
+	console.log(monster.position);
+	monster.bom = true;
+	monster.alive = false;
+}
+
+
+function loadAvatar(player, pos) {
+	return new Promise((resolve, reject) => {
+		if (theModel.type == "fbx") {
+			loader = new FBXLoader();
+		} else {
+			loader = new GLTFLoader();
+		}
+		loader.crossOrigin = "anonymous";
+		loader.load(
+			theModel.path,
+			(gltf) => {
+				let model = null;
+				if (theModel.type == "fbx") {
+					model = gltf;
+					player.model = model;
+					player.model.scale.set(0.01, 0.01, 0.01);
+				}
+				player.model.position.set(pos.x, pos.y, pos.z);
+				player.skeletonHelper = new THREE.SkeletonHelper(player.model);
+				player.skeletonHelper.visible = false;
+				player.skeletonHelper.material.linewidth = 30;
+
+				scene.add(player.skeletonHelper);
+
+				player.model.castShadow = true;
+				player.model.children.forEach(child => {
+					child.castShadow = true;
+				});
+				scene.add(player.model);
+				player.avatarRotY = player.model.rotation.y;
+
+				const geometry = new THREE.CircleGeometry(0.6, 32, 0, Math.PI * 2);
+				let color = player.id == 1 ? 0xff0000 : 0x0000ff;
+				const material = new THREE.MeshBasicMaterial({
+					color: color,
+					side: THREE.DoubleSide,
+					transparent: true,
+					opacity: 0.4
+				});
+				const circle = new THREE.Mesh(geometry, material);
+				circle.position.y = 0.1;
+				circle.position.x = pos.x;
+				circle.position.z = pos.z;
+				circle.rotation.x = Math.PI / 2;
+				player.circle = circle;
+				scene.add(circle);
+
+
+				resolve(1)
+			},
+
+			// called while loading is progressing
+			(progress) =>
+			console.log(
+				"Loading model...", 100.0 * (progress.loaded / progress.total), "%"
+			),
+
+			// called when loading has errors
+			(error) => {
+				reject(1);
+				app.failed = true;
+				console.log(error);
+			}
+		);
+	});
+
+}
+
+function setHelper() {
+	// helpers
+	//const gridHelper = new THREE.GridHelper(50, 50);
+	//gridHelper.receiveShadow = true;
+	//scene.add(gridHelper);
+
+	const axesHelper = new THREE.AxesHelper(50);
+	scene.add(axesHelper);
+}
+
+function getCenter(obj) {
+	const selectedDecorationBbox = new THREE.Box3().setFromObject(obj);
+	let center = new THREE.Vector3();
+	let midPoint = selectedDecorationBbox.getCenter(center);
+}
+
+function loadActions() {
+	let loader = new FBXLoader();
+	player1.animationMixer = new THREE.AnimationMixer(player1.model);
+	player2.animationMixer = new THREE.AnimationMixer(player2.model);
+	loader.load('./model/walkforward.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			player1.actions["walk_forward"] = player1.animationMixer.clipAction(clip);
+			player2.actions["walk_forward"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	loader.load('./model/walkbackward.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			player1.actions["walk_backward"] = player1.animationMixer.clipAction(clip);
+			player2.actions["walk_backward"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	loader.load('./model/walkleft.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			//actions["walk_left"] = animationMixer.clipAction(clip);
+			player1.actions["walk_left"] = player1.animationMixer.clipAction(clip);
+			player2.actions["walk_left"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	loader.load('./model/walkright.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			//actions["walk_right"] = animationMixer.clipAction(clip);
+			player1.actions["walk_right"] = player1.animationMixer.clipAction(clip);
+			player2.actions["walk_right"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	loader.load('./model/idle.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			//actions["idle"] = animationMixer.clipAction(clip);
+			player1.actions["idle"] = player1.animationMixer.clipAction(clip);
+			player2.actions["idle"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+
+	loader.load('./model/jumping.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			//actions["jump"] = animationMixer.clipAction(clip);
+			player1.actions["jump"] = player1.animationMixer.clipAction(clip);
+			player2.actions["jump"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	loader.load('./model/shooting.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			//actions["shoot"] = animationMixer.clipAction(clip);
+			player1.actions["shoot"] = player1.animationMixer.clipAction(clip);
+			player2.actions["shoot"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	loader.load('./model/death.fbx', function(gltf) {
+		gltf.animations.forEach((clip) => {
+			//console.log(clip)
+			//actions["death"] = animationMixer.clipAction(clip);
+			player1.actions["death"] = player1.animationMixer.clipAction(clip);
+			player2.actions["death"] = player2.animationMixer.clipAction(clip);
+		});
+
+	});
+	setTimeout(() => {
+		app.loaded = true;
+		console.log(player1.actions["shoot"]);
+		player1.actions["idle"].play();
+		player2.actions["idle"].play();
+		player1.currentAction = player1.actions["idle"];
+		player1.currentActionName = "idle";
+		player2.currentAction = player2.actions["idle"];
+		player2.currentActionName = "idle";
+	}, 3000)
+
+}
+
+function switchAction(player, newActionName, fadeDuration = 0.1) {
+	console.log("switch to action " + newActionName, player.id)
+	const newAction = player.actions[newActionName];
+	if (newAction && player.currentAction !== newAction) {
+		player.previousAction = player.currentAction;
+		if (player.previousAction) {
+			player.previousAction.fadeOut(fadeDuration);
+		}
+
+		if (newActionName === 'jump' || newActionName === 'death' ||
+			newActionName === 'walk_forward' || newActionName === 'shoot' ||
+			newActionName === 'walk_backward' || newActionName === 'walk_left' ||
+			newActionName === 'walk_right') {
+			newAction.loop = THREE.LoopOnce;
+			newAction.clampWhenFinished = true;
+		}
+
+		player.currentAction = newAction;
+
+		player.currentAction.reset();
+		if (newActionName === 'shoot')
+			player.currentAction.setEffectiveTimeScale(4);
+		else
+			player.currentAction.setEffectiveTimeScale(2);
+		player.currentAction.setEffectiveWeight(1);
+		player.currentAction.fadeIn(fadeDuration).play();
+	} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
+		//console.log("need to fire");
+	}
+}
+
+function setFloor() {
+	let planeGeometry = new THREE.PlaneGeometry(100, 100);
+	let planeMaterial = new THREE.MeshPhongMaterial({
+		color: 0xFFFFFF
+	});
+
+	let plane = new THREE.Mesh(planeGeometry, planeMaterial);
+	plane.rotation.x = -0.5 * Math.PI;
+	plane.position.y = -0;
+
+	textureLoader.load('./lib/grid.png', function(texture) {
+
+		texture.colorSpace = THREE.SRGBColorSpace;
+		texture.wrapS = THREE.RepeatWrapping;
+		texture.wrapT = THREE.RepeatWrapping;
+		texture.repeat.set(40, 40);
+		plane.material.map = texture;
+		plane.material.needsUpdate = true;
+
+	});
+
+	plane.castShadow = true;
+	plane.receiveShadow = true;
+
+	scene.add(plane);
+}
+
+
+
+function toggleShow(k, obj) {
+	console.log(k);
+	if (
+		obj
+		.querySelector(".mdui-list-item-content")
+		.innerText.includes('hide')
+	) {
+		scene.getObjectByName(k).visible = false;
+		obj.querySelector(".mdui-list-item-content").innerText =
+			'show' +
+			obj
+			.querySelector(".mdui-list-item-content")
+			.innerText.substr(
+				'hide'.length
+			);
+	} else {
+		scene.getObjectByName(k).visible = true;
+		obj.querySelector(".mdui-list-item-content").innerText =
+			'hide' +
+			obj
+			.querySelector(".mdui-list-item-content")
+			.innerText.substr(
+				'show'.length
+			);
+	}
+}
+
+
+const renderer = new THREE.WebGLRenderer({
+	//alpha: true,
+	antialias: true,
+	//logarithmicDepthBuffer: true
+});
+renderer.shadowMapEnabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setSize(
+	document.querySelector("#model").clientWidth,
+	document.querySelector("#model").clientHeight
+);
+//renderer.autoClear = false;
+renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
+//ReinhardToneMapping
+renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
+//renderer.toneMapping = THREE.ReinhardToneMapping; // 色调映射
+renderer.toneMappingExposure = 0.9; // 色调映射曝光
+renderer.setPixelRatio(window.devicePixelRatio);
+//renderer.setClearColor(0x000000, 1); //设置背景颜色
+document.querySelector("#model").appendChild(renderer.domElement);
+const stats = new Stats();
+stats.showPanel(0);
+document.querySelector('#model').appendChild(stats.domElement);
+
+
+
+
+// camera
+const camera = new THREE.PerspectiveCamera(
+	50,
+	document.querySelector("#model").clientWidth /
+	document.querySelector("#model").clientHeight,
+	0.1,
+	50.0
+);
+camera.position.set(-1, 3, -10);
+camera.lookAt(0, 0, 0);
+
+composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+// 给EffectComposer添加一个渲染器通道 
+composer.addPass(renderPass);
+
+
+const v2 = new THREE.Vector2(document.querySelector("#model").clientWidth,
+	document.querySelector("#model").clientHeight);
+// OutlinePass第一个参数的尺寸和canvas画布保持一致
+outlinePass = new OutlinePass(v2, scene, camera);
+outlinePass.visibleEdgeColor.set(0xFFFFFF); // 可见边框颜色
+outlinePass.hiddenEdgeColor.set(0x0000FF); // 隐藏边框颜色
+outlinePass.edgeStrength = 5; // 高亮描边发光强度
+outlinePass.edgeGlow = 0.1; // 光晕[0,1] 
+outlinePass.edgeThickness = 2; // 高亮发光描边厚度(边缘宽度) 
+outlinePass.pulsePeriod = 2; // 模型闪烁频率控制
+outlinePass.renderToScreen = true; // 设置这个参数的目的是马上将当前的内容输出
+// 将OutlinePass通道添加到后处理composer中
+composer.addPass(outlinePass);
+
+let gammaPass = new ShaderPass(THREE.GammaCorrectionShader);
+gammaPass.renderToScreen = true;
+composer.addPass(gammaPass);
+outlinePass.selectedObjects = [];
+
+
+window.addEventListener(
+	"resize",
+	function() {
+		camera.aspect =
+			document.querySelector("#model").clientWidth /
+			document.querySelector("#model").clientHeight;
+		camera.updateProjectionMatrix();
+		renderer.setSize(
+			document.querySelector("#model").clientWidth,
+			document.querySelector("#model").clientHeight
+		);
+	},
+	false
+);
+
+
+// scene
+
+setBackground();
+setFloor();
+let a = await loadAvatar(player1, new THREE.Vector3(-2, 0, 0));
+let b = await loadAvatar(player2, new THREE.Vector3(2, 0, 0));
+console.log(player2.model);
+//player2.model.material.color.set(0xff0000);
+player2.model.traverse(function(obj) {
+	// 判断子对象是否是物体，如果是，更改其颜色
+	if (obj.isMesh) {
+		obj.material = new THREE.MeshPhongMaterial({
 			color: 0x0000ff, // 设置材质颜色
 			specular: 0xffffff, // 设置高光颜色
 			shininess: 100, // 设置高光强度
 			combine: THREE.MixOperation, // 设置环境映射的混合模式
 			reflectivity: 1 // 设置材质的反射强度
 		});
-		}
-	})
-	loadActions();
-	createMonster2();
-	setLight();
-	setHelper();
-	setControll();
-	createWall();
-
-	function handleActions(player) {
-		if (
-			(player.currentAction === player.actions['walk_forward'] || player.currentAction === player.actions[
-					'jump'] ||
-				player.currentAction === player.actions['shoot'] || player.currentAction === player.actions[
-					'walk_backward'] ||
-				player.currentAction === player.actions['walk_left'] || player.currentAction === player.actions[
-					'walk_right']) &&
-			player.currentAction.time >= player.currentAction.getClip().duration
-		) {
-			//console.log(player.id);
-			if (player.currentAction === player.actions['shoot'])
-				createBullet(player.model.position);
-			switchAction(player, 'idle', 0.1);
-		}
-		// 当处于 running 动作时，移动相机
-		let playerBox = new THREE.Box3().setFromObject(player.model);
-		let canMove = true;
-		if (
-			player.currentAction === player.actions['walk_forward']
-		) {
-			wallArr.forEach(wall => {
-				if (wall.position.z > player.model.position.z) {
-					let wallMeshBox = new THREE.Box3().setFromObject(wall);
-					if (wallMeshBox.intersectsBox(playerBox)) {
-						canMove = false;
-					}
-				}
-			})
-			if (canMove) {
-				let dz = 0.03;
-				player.model.position.z += dz;
-				player.circle.position.z = player.model.position.z;
-			}
-		}
-		if (
-			player.currentAction === player.actions['walk_backward']
-		) {
-			wallArr.forEach(wall => {
-				if (wall.position.z < player.model.position.z) {
-					let wallMeshBox = new THREE.Box3().setFromObject(wall);
-					if (wallMeshBox.intersectsBox(playerBox)) {
-						canMove = false;
-					}
-				}
-			})
-			if (canMove) {
-				let dz = -0.03;
-				player.model.position.z += dz;
-				player.circle.position.z = player.model.position.z;
-			}
-		}
-		if (
-			player.currentAction === player.actions['walk_left']
-		) {
-			wallArr.forEach(wall => {
-				if (wall.position.x > player.model.position.x) {
-					let wallMeshBox = new THREE.Box3().setFromObject(wall);
-					if (wallMeshBox.intersectsBox(playerBox)) {
-						canMove = false;
-					}
-				}
-			})
-			if (canMove) {
-				let dx = 0.03;
-				player.model.position.x += dx;
-				player.circle.position.x = player.model.position.x;
-			}
-		}
-		if (
-			player.currentAction === player.actions['walk_right']
-		) {
-			wallArr.forEach(wall => {
-				if (wall.position.x < player.model.position.x) {
-					let wallMeshBox = new THREE.Box3().setFromObject(wall);
-					if (wallMeshBox.intersectsBox(playerBox)) {
-						canMove = false;
-					}
-				}
-			})
-			if (canMove) {
-				let dx = -0.03;
-				player.model.position.x += dx;
-				player.circle.position.x = player.model.position.x;
-			}
-		}
 	}
+})
+loadActions();
+createMonster2();
+setLight();
+setHelper();
+setControll();
+createWall();
 
-	function animate() {
-
-		let bulletList = [];
-		bulletArr.forEach(item => {
-			if (item.alive && item.distance < 30)
-				bulletList.push(item);
-			else
-				scene.remove(item.obj)
-		});
-		bulletArr = bulletList;
-		bulletArr.forEach(item => {
-			if (item.alive) {
-				let dx = item.speed * Math.sin(item.angle);
-				let dz = item.speed * Math.cos(item.angle);
-				item.obj.position.x += dx;
-				item.obj.position.z += dz;
-				item.distance += item.speed;
-			}
-		});
-
-		let monsterList = [];
-		monsterArr.forEach(item => {
-			if (item.alive) {
-				if (item.distance < 200) {
-					monsterList.push(item);
-				} else {
-					scene.remove(item);
-					item=null;
-				}
-			}
-			if (item && item.bom) {
-				if (item.bomTimer < 30) {
-					monsterList.push(item);
-				} else {
-					scene.remove(item);
-					item=null;
-				}
-			}
-		});
-		monsterArr = monsterList;
-
-		monsterArr.forEach(item => {
-			if (item.alive) {
-				let dx = item.speed * Math.sin(item.angle);
-				let dz = item.speed * Math.cos(item.angle);
-				item.translateZ(-dz);
-				item.translateX(dx);
-				//item.rotation.x += 0.01;
-				//item.rotation.z += 0.01;
-				item.distance += item.speed;
-			}
-			if (item.bom) {
-				item.traverse(function(child) {
-					// 判断子对象是否是物体，如果是，更改其颜色
-					if (child.isMesh) {
-						let dir = new THREE.Vector3().copy(child.position.clone().normalize())
-						//console.log(dir);
-						let dx = dir.x * item.bomSpeed;
-						let dy = dir.y * item.bomSpeed;
-						let dz = dir.z * item.bomSpeed;
-						child.position.x += dx;
-						child.position.y += dy;
-						child.position.z += dz;
-					}
-				})
-				item.bomTimer += 1;
-			}
-		});
-
-		let delta = clock.getDelta();
-		if (player1.animationMixer != null) {
-			player1.animationMixer.update(delta);
-		}
-		if (player2.animationMixer != null) {
-			player2.animationMixer.update(delta);
-		}
-		handleActions(player1);
-		if (app.doublePlayer)
-			handleActions(player2);
-
-		// check collide
-		let playerBox = new THREE.Box3().setFromObject(player1.model);
-		monsterArr.forEach(item => {
-			if (item.alive) {
-				let boxMeshBox = new THREE.Box3().setFromObject(item);
-				if (playerBox.intersectsBox(boxMeshBox)) {
-					player1.life -= 2;
-					bomMonster(item);
-				}
-				wallArr.forEach(wall => {
-					let wallMeshBox = new THREE.Box3().setFromObject(wall);
-					if (wallMeshBox.intersectsBox(boxMeshBox)) {
-						bomMonster(item);
-					}
-				})
-				bulletArr.forEach(bullet => {
-					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
-					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
-						bullet.alive = false;
-						bomMonster(item);
-					}
-				})
-			}
-
-		});
-		bulletArr.forEach(bullet => {
-			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
-			wallArr.forEach(wall => {
+function handleActions(player) {
+	if (
+		(player.currentAction === player.actions['walk_forward'] || player.currentAction === player.actions[
+				'jump'] ||
+			player.currentAction === player.actions['shoot'] || player.currentAction === player.actions[
+				'walk_backward'] ||
+			player.currentAction === player.actions['walk_left'] || player.currentAction === player.actions[
+				'walk_right']) &&
+		player.currentAction.time >= player.currentAction.getClip().duration
+	) {
+		//console.log(player.id);
+		if (player.currentAction === player.actions['shoot'])
+			createBullet(player.model.position);
+		switchAction(player, 'idle', 0.1);
+	}
+	// 当处于 running 动作时，移动相机
+	let playerBox = new THREE.Box3().setFromObject(player.model);
+	let canMove = true;
+	if (
+		player.currentAction === player.actions['walk_forward']
+	) {
+		wallArr.forEach(wall => {
+			if (wall.position.z > player.model.position.z) {
 				let wallMeshBox = new THREE.Box3().setFromObject(wall);
-				if (wallMeshBox.intersectsBox(bulletMeshBox)) {
-					bullet.alive = false;
+				if (wallMeshBox.intersectsBox(playerBox)) {
+					canMove = false;
 				}
-			})
+			}
 		})
-
-		app.player1Life = player1.life;
-		uniforms.iTime.value += 0.05;
-		stats.update();
-		
-		//composer.render()
-	
-		renderer.render(scene, camera)
-		requestAnimationFrame(animate);
+		if (canMove) {
+			let dz = 0.03;
+			player.model.position.z += dz;
+			player.circle.position.z = player.model.position.z;
+		}
 	}
-
-	animate();
-
-	let GUI = lil.GUI;
-	let gui = new GUI();
-	gui.hide();
-	setupDatGui();
-	mdui.mutation();
-
-	function setupDatGui() {
-		let folder = gui.addFolder("Settings");
-		folder.add(camera.position, "z", -10, 10);
-		folder.controllers[0].name("camera distance");
-
-		folder.add(app, "doublePlayer");
-		folder.controllers[1].name("double player");
-		let guiroot = document.querySelector(".lil-gui.root");
-		guiroot.style.left = "calc(calc(100vw - let(--side-bar-width)) + 19.1vw - 122px)";
-		guiroot.style.webkitAppRegion = "no-drag";
-		guiroot.style.zIndex = "10000";
+	if (
+		player.currentAction === player.actions['walk_backward']
+	) {
+		wallArr.forEach(wall => {
+			if (wall.position.z < player.model.position.z) {
+				let wallMeshBox = new THREE.Box3().setFromObject(wall);
+				if (wallMeshBox.intersectsBox(playerBox)) {
+					canMove = false;
+				}
+			}
+		})
+		if (canMove) {
+			let dz = -0.03;
+			player.model.position.z += dz;
+			player.circle.position.z = player.model.position.z;
+		}
 	}
+	if (
+		player.currentAction === player.actions['walk_left']
+	) {
+		wallArr.forEach(wall => {
+			if (wall.position.x > player.model.position.x) {
+				let wallMeshBox = new THREE.Box3().setFromObject(wall);
+				if (wallMeshBox.intersectsBox(playerBox)) {
+					canMove = false;
+				}
+			}
+		})
+		if (canMove) {
+			let dx = 0.03;
+			player.model.position.x += dx;
+			player.circle.position.x = player.model.position.x;
+		}
+	}
+	if (
+		player.currentAction === player.actions['walk_right']
+	) {
+		wallArr.forEach(wall => {
+			if (wall.position.x < player.model.position.x) {
+				let wallMeshBox = new THREE.Box3().setFromObject(wall);
+				if (wallMeshBox.intersectsBox(playerBox)) {
+					canMove = false;
+				}
+			}
+		})
+		if (canMove) {
+			let dx = -0.03;
+			player.model.position.x += dx;
+			player.circle.position.x = player.model.position.x;
+		}
+	}
+}
 
-	// keyborad control camera position
-	document.addEventListener("keydown", (event) => {
-		//console.log(event);
-		let step = 0.01;
-		//ArrowLeft ArrowRight
-		switch (event.key) {
-			case "w":
-				//camera.position.set(x + step, y, z);
-				switchAction(player1, 'walk_forward');
-				break;
-			case "a":
-				switchAction(player1, 'walk_left');
-				//avatar.rotation.y = avatarRotY;
-				break;
-			case "d":
-				switchAction(player1, 'walk_right');
-				//avatar.rotation.y = avatarRotY;
-				break;
-			case "s":
-				switchAction(player1, 'walk_backward');
-				//avatar.rotation.y = avatarRotY;
-				break;
-			case "j":
-				switchAction(player1, 'shoot');
-				break;
-			case "k":
-				switchAction(player1, 'jump');
-				break;
+function animate() {
 
-			case "ArrowRight":
-				switchAction(player2, 'walk_right');
-				break;
-
-			case "ArrowLeft":
-				switchAction(player2, 'walk_left');
-				break;
-
-			case "ArrowUp":
-				switchAction(player2, 'walk_forward');
-				break;
-
-			case "ArrowDown":
-				switchAction(player2, 'walk_backward');
-				break;
-			case "1":
-				switchAction(player2, 'shoot');
-				break;
-			case "2":
-				switchAction(player2, 'jump');
-				break;
+	let bulletList = [];
+	bulletArr.forEach(item => {
+		if (item.alive && item.distance < 30)
+			bulletList.push(item);
+		else
+			scene.remove(item.obj)
+	});
+	bulletArr = bulletList;
+	bulletArr.forEach(item => {
+		if (item.alive) {
+			let dx = item.speed * Math.sin(item.angle);
+			let dz = item.speed * Math.cos(item.angle);
+			item.obj.position.x += dx;
+			item.obj.position.z += dz;
+			item.distance += item.speed;
 		}
 	});
 
+	let monsterList = [];
+	monsterArr.forEach(item => {
+		if (item.alive) {
+			if (item.distance < 200) {
+				monsterList.push(item);
+			} else {
+				scene.remove(item);
+				item = null;
+			}
+		}
+		if (item && item.bom) {
+			if (item.bomTimer < 30) {
+				monsterList.push(item);
+			} else {
+				scene.remove(item);
+				item = null;
+			}
+		}
+	});
+	monsterArr = monsterList;
 
-})();
+	monsterArr.forEach(item => {
+		if (item.alive) {
+			let dx = item.speed * Math.sin(item.angle);
+			let dz = item.speed * Math.cos(item.angle);
+			item.translateZ(-dz);
+			item.translateX(dx);
+			//item.rotation.x += 0.01;
+			//item.rotation.z += 0.01;
+			item.distance += item.speed;
+		}
+		if (item.bom) {
+			item.traverse(function(child) {
+				// 判断子对象是否是物体，如果是，更改其颜色
+				if (child.isMesh) {
+					let dir = new THREE.Vector3().copy(child.position.clone().normalize())
+					//console.log(dir);
+					let dx = dir.x * item.bomSpeed;
+					let dy = dir.y * item.bomSpeed;
+					let dz = dir.z * item.bomSpeed;
+					child.position.x += dx;
+					child.position.y += dy;
+					child.position.z += dz;
+				}
+			})
+			item.bomTimer += 1;
+		}
+	});
+
+	let delta = clock.getDelta();
+	if (player1.animationMixer != null) {
+		player1.animationMixer.update(delta);
+	}
+	if (player2.animationMixer != null) {
+		player2.animationMixer.update(delta);
+	}
+	handleActions(player1);
+	if (app.doublePlayer)
+		handleActions(player2);
+
+	// check collide
+	let playerBox = new THREE.Box3().setFromObject(player1.model);
+	monsterArr.forEach(item => {
+		if (item.alive) {
+			let boxMeshBox = new THREE.Box3().setFromObject(item);
+			if (playerBox.intersectsBox(boxMeshBox)) {
+				player1.life -= 2;
+				bomMonster(item);
+			}
+			wallArr.forEach(wall => {
+				let wallMeshBox = new THREE.Box3().setFromObject(wall);
+				if (wallMeshBox.intersectsBox(boxMeshBox)) {
+					bomMonster(item);
+				}
+			})
+			bulletArr.forEach(bullet => {
+				let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
+				if (bulletMeshBox.intersectsBox(boxMeshBox)) {
+					bullet.alive = false;
+					bomMonster(item);
+				}
+			})
+		}
+
+	});
+	bulletArr.forEach(bullet => {
+		let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
+		wallArr.forEach(wall => {
+			let wallMeshBox = new THREE.Box3().setFromObject(wall);
+			if (wallMeshBox.intersectsBox(bulletMeshBox)) {
+				bullet.alive = false;
+			}
+		})
+	})
+
+	app.player1Life = player1.life;
+	uniforms.iTime.value += 0.05;
+	stats.update();
+
+	//composer.render()
+
+	renderer.render(scene, camera)
+	requestAnimationFrame(animate);
+}
+
+animate();
+
+
+
+// keyborad control camera position
+document.addEventListener("keydown", (event) => {
+	//console.log(event);
+	let step = 0.01;
+	//ArrowLeft ArrowRight
+	switch (event.key) {
+		case "w":
+			//camera.position.set(x + step, y, z);
+			switchAction(player1, 'walk_forward');
+			break;
+		case "a":
+			switchAction(player1, 'walk_left');
+			//avatar.rotation.y = avatarRotY;
+			break;
+		case "d":
+			switchAction(player1, 'walk_right');
+			//avatar.rotation.y = avatarRotY;
+			break;
+		case "s":
+			switchAction(player1, 'walk_backward');
+			//avatar.rotation.y = avatarRotY;
+			break;
+		case "j":
+			switchAction(player1, 'shoot');
+			break;
+		case "k":
+			switchAction(player1, 'jump');
+			break;
+
+		case "ArrowRight":
+			switchAction(player2, 'walk_right');
+			break;
+
+		case "ArrowLeft":
+			switchAction(player2, 'walk_left');
+			break;
+
+		case "ArrowUp":
+			switchAction(player2, 'walk_forward');
+			break;
+
+		case "ArrowDown":
+			switchAction(player2, 'walk_backward');
+			break;
+		case "1":
+			switchAction(player2, 'shoot');
+			break;
+		case "2":
+			switchAction(player2, 'jump');
+			break;
+	}
+});
