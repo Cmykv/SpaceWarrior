@@ -107,14 +107,18 @@
 				border: 0;
 				font-size: 16px;
 				border-radius: 5px;
+				font-weight: bold;
+				border: solid 1px #0055ff;
 			}
 
 			.btn_yellow {
-				background-color: #ffff00;
+				background-color: #00ff00;
 				color: white;
 				border: 0;
 				font-size: 16px;
 				border-radius: 5px;
+				font-weight: bold;
+				border: solid 1px #00aa00;
 			}
 
 			/* .jse-search{display: none;} */
@@ -140,11 +144,16 @@
 					<h1 style="color:red">Space Warrior</h1>
 					<hr />
 					<h4 style="color:red">Control info</h4>
-					<img src="lib/keyboard_info.png" style="width: 500px;" />
+					<div style="border:solid 2px;border-radius: 5px;">
+					<img src="lib/keyboard_info.png" style="width: 590px;" />
+					</div>
 					<hr />
 					<button class="btn_blue" style="width: 100%;height: 50px;font-size: 20px;">Load Game</button>
-					<button id="btn_start" class="btn_yellow"
-						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start
+					<button id="btn_start_1" class="btn_yellow"
+						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 1 player
+						Game</button>
+					<button id="btn_start_2" class="btn_yellow"
+						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 2 players
 						Game</button>
 				</div>
 			</div>
@@ -219,10 +228,9 @@
                             ">
 							{{model.type.toUpperCase()}}
 						</div>
-						<div style="width: 100%; margin-top: 20px; display:block ">
+						<div style="width: 100%; margin-top: 20px; display:block;padding: 10px;">
 							<div style="
-                                    width: 22vw;
-                                    height: 15vw;
+                                    
                                     margin: auto;
                                     border-radius: 20px;
                                     overflow: hidden;
@@ -238,8 +246,11 @@
 							</div>
 						</div>
 						<div class="mdui-list" style="margin-top: 20px">
-							<h3>
-								score:{{player1Score}}&nbsp;&nbsp;&nbsp;&nbsp;life:{{player1Life}}
+							<h3 style="color:red">
+								Player 1 :score:{{player1Score}}&nbsp;&nbsp;&nbsp;&nbsp;life:{{player1Life}}
+							</h3>
+							<h3 v-if="doublePlayer" style="color:blue">
+								Player 2 :score:{{player2Score}}&nbsp;&nbsp;&nbsp;&nbsp;life:{{player2Life}}
 							</h3>
 							<button id="btn_set" class="btn_blue" style="width:80px;height:30px">setting</button>
 						</div>

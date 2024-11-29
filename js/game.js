@@ -30,7 +30,7 @@ import {
 import {
 	FXAAShader
 } from 'three/addons/shaders/FXAAShader.js';
-
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 const theModel = {
 	"name": "Vanguard",
 	"path": "model/Vanguard.fbx",
@@ -54,90 +54,93 @@ let app = new Vue({
 		failed: false,
 		failedText: "Load failed",
 		player1Score: 0,
-		player1Life: 100
+		player1Life: 100,
+		player2Score: 0,
+		player2Life: 100,
 	},
 });
-let player1 = {
-	id: 1,
-	model: null,
-	avatarRotY: 0,
-	currentActionName: "idle",
-	currentAction: null,
-	previousAction: null,
-	skeletonHelper: null,
-	actions: [],
-	animationMixer: null,
-	score: 0,
-	life: 100,
-	foot: null
-};
-let player2 = {
-	id: 2,
-	model: null,
-	avatarRotY: 0,
-	currentActionName: "idle",
-	currentAction: null,
-	previousAction: null,
-	skeletonHelper: null,
-	actions: [],
-	animationMixer: null,
-	score: 0,
-	life: 100,
-	foot: null
-};
-const uniforms = {
-	iTime: {
-		value: 0
-	},
-	iResolution: {
-		value: new THREE.Vector2(window.innerWidth, window.innerHeight)
-	}
-};
 
-
-let clock = new THREE.Clock();
-// gltf and vrm
-let loader = null;
-let bulletArr = [];
-let monsterArr = [];
-let wallArr = [];
-let monsterDuration = 1000;
-let monsterRadius = 0.06;
-let innerWidth = document.querySelector("#model").clientWidth;
-let innerHeight = document.querySelector("#model").clientHeight;
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xa0a0a0);
-//scene.fog = new THREE.Fog(0xa0a0a0, 500, 2000);
-
-
-let composer;
-let outlinePass;
-const textureLoader = new THREE.TextureLoader();
-let rockMap = textureLoader.load("./lib/rock.png");
-rockMap.wrapS = THREE.RepeatWrapping;
-rockMap.wrapT = THREE.RepeatWrapping;
-document.getElementById("btn_set").onclick = () => {
-	if (!app.showSetting) {
-		gui.show();
-	} else {
-		gui.hide();
-	}
-	app.showSetting = !app.showSetting
-}
 
 let modal = document.getElementById("myModal");
-document.getElementById("btn_start").onclick = () => {
+document.getElementById("btn_start_1").onclick = () => {
 	modal.style.display = "none";
+	init();
 }
 
+document.getElementById("btn_start_2").onclick = () => {
+	app.doublePlayer = true;
+	modal.style.display = "none";
+	init();
+}
 
-const vertexShader = `
+function init() {
+
+	let player1 = {
+		id: 1,
+		model: null,
+		avatarRotY: 0,
+		currentActionName: "idle",
+		currentAction: null,
+		previousAction: null,
+		skeletonHelper: null,
+		actions: [],
+		animationMixer: null,
+		score: 0,
+		life: 100,
+		foot: null
+	};
+	let player2 = {
+		id: 2,
+		model: null,
+		avatarRotY: 0,
+		currentActionName: "idle",
+		currentAction: null,
+		previousAction: null,
+		skeletonHelper: null,
+		actions: [],
+		animationMixer: null,
+		score: 0,
+		life: 100,
+		foot: null
+	};
+	const uniforms = {
+		iTime: {
+			value: 0
+		},
+		iResolution: {
+			value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+		}
+	};
+
+
+	let clock = new THREE.Clock();
+	// gltf and vrm
+	let loader = new FBXLoader();;
+	let bulletArr = [];
+	let monsterArr = [];
+	let wallArr = [];
+	let monsterDuration = 1000;
+	let monsterRadius = 6;
+	let innerWidth = document.querySelector("#model").clientWidth;
+	let innerHeight = document.querySelector("#model").clientHeight;
+	const scene = new THREE.Scene();
+	//scene.background = new THREE.Color(0xa0a0a0);
+	//scene.fog = new THREE.Fog(0xa0a0a0, 500, 1000);
+
+
+	let composer, effectFXAA, outlinePass;
+	let selectedObjects = [];
+
+
+
+
+	const vertexShader = `
    void main() {
        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
    }
    `;
 
-const fragmentShader = `
+	const fragmentShader = `
    uniform float iTime;
    uniform vec2 iResolution;
    int iterations=17;
@@ -199,167 +202,177 @@ const fragmentShader = `
    `;
 
 
-function setBackground() {
+	function setBackground() {
 
 
-	const shaderMaterial = new THREE.ShaderMaterial({
-		uniforms: uniforms,
-		vertexShader: vertexShader,
-		fragmentShader: fragmentShader,
-	});
-
-	const geometry = new THREE.PlaneGeometry(5000, 5000);
-	const mesh = new THREE.Mesh(geometry, shaderMaterial);
-	mesh.position.set(0, 0, 2000);
-	mesh.rotation.y = -Math.PI;
-	scene.add(mesh);
-}
-
-function setControll() {
-	const controls = new OrbitControls(
-		camera,
-		renderer.domElement
-	);
-	controls.screenSpacePanning = true;
-	controls.target.set(0.0, 1.0, 0.0);
-	controls.update();
-
-}
-
-function setLight() {
-	
-	const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444, 5 );
-	hemiLight.position.set( 0, 500, 0 );
-	scene.add( hemiLight );
-	const hemiLightHelper = new THREE.HemisphereLightHelper( hemiLight, 10 );
-	scene.add( hemiLightHelper );
-	
-	const dirLight = new THREE.DirectionalLight( 0xffffff, 5 );
-	dirLight.color.setHSL( 0.1, 1, 0.95 );
-	dirLight.position.set( 0, 500, 300 );
-	dirLight.castShadow = true;
-	dirLight.shadow.mapSize.width = 500;
-	dirLight.shadow.mapSize.height = 500;
-	let d=500;
-	dirLight.shadow.camera.left = - d;
-	dirLight.shadow.camera.right = d;
-	dirLight.shadow.camera.top = d;
-	dirLight.shadow.camera.bottom = - d;
-	
-	dirLight.shadow.camera.far = 3500;
-	dirLight.shadow.bias = - 0.0001;
-	
-	const dirLightHelper = new THREE.DirectionalLightHelper( dirLight, 10 );
-	scene.add( dirLightHelper );
-	scene.add( dirLight );
-
-}
-
-function createWall() {
-	for (let i = 0; i < 2; i++) {
-		let cubeGeometry = new THREE.BoxGeometry(100, 200, 100);
-		let cubeMaterial = new THREE.MeshLambertMaterial({
-			color: 0x2a0000
+		const shaderMaterial = new THREE.ShaderMaterial({
+			uniforms: uniforms,
+			vertexShader: vertexShader,
+			fragmentShader: fragmentShader,
 		});
 
-		let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-		//THREE.MathUtils.randFloatSpread(1000)
-		cube.position.x = 500*(i>0?1:-1);
-		cube.position.y = 100;
-		cube.position.z = 300;
-		//cube.layers.set(1);
-		//告诉立方体需要投射阴影
-		cube.castShadow = true;
-		cube.receiveShadow = true;
-		scene.add(cube);
-		wallArr.push(cube);
-	}
-}
-
-
-
-function createBullet(pos) {
-	const geometry = new THREE.SphereGeometry(0.1, 50, 50);
-	//const material = new THREE.MeshBasicMaterial({ map: map });
-	const material = new THREE.MeshPhongMaterial({
-		color: 0xffffff, // 设置材质颜色
-		specular: 0xffffff, // 设置高光颜色
-		shininess: 100, // 设置高光强度
-		combine: THREE.MixOperation, // 设置环境映射的混合模式
-		reflectivity: 3 // 设置材质的反射强度
-	});
-	let sphere = new THREE.Mesh(geometry, material);;
-	sphere.position.x = pos.x + 0;
-	sphere.position.y = 1.3;
-	sphere.position.z = pos.z + 0.8;
-	scene.add(sphere);
-	let bullet = {};
-	bullet.obj = sphere;
-	bullet.speed = 0.5;
-	bullet.angle = 0;
-	bullet.distance = 0;
-	bullet.alive = true;
-	bulletArr.push(bullet)
-	if (outlinePass) {
-		outlinePass.selectedObjects.push(bullet.obj);
+		const geometry = new THREE.PlaneGeometry(5000, 5000);
+		const mesh = new THREE.Mesh(geometry, shaderMaterial);
+		mesh.position.set(0, 0, 2000);
+		mesh.rotation.y = -Math.PI;
+		scene.add(mesh);
 	}
 
-}
+	function setControll() {
+		const controls = new OrbitControls(
+			camera,
+			renderer.domElement
+		);
+		controls.screenSpacePanning = true;
+		controls.target.set(0.0, 1.0, 0.0);
+		controls.update();
 
-function createMonster2() {
-	let r = monsterRadius;
-	let x = THREE.MathUtils.randFloatSpread(10) - 5;
-	let y = 1;
-	let z = THREE.MathUtils.randFloatSpread(100) + 20;
-	const geometry = new THREE.SphereGeometry(r, 10, 10);
-	// 创建材质
-	const material = new THREE.MeshPhongMaterial({
-		map: rockMap
-	});
-	const group = new THREE.Group();
-	for (let i = -3; i <= 3; i++)
-		for (let j = -3; j <= 3; j++)
-			for (let m = -3; m <= 3; m++) {
-				if (Math.sqrt(i * i + j * j + m * m) > 3.5)
-					continue;
+	}
 
-				let ball = new THREE.Mesh(geometry, material)
-				ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
-				group.add(ball);
+	function setLight() {
+
+		const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 5);
+		hemiLight.position.set(0, 500, 0);
+		scene.add(hemiLight);
+		//const hemiLightHelper = new THREE.HemisphereLightHelper(hemiLight, 10);
+		//scene.add(hemiLightHelper);
+
+		const dirLight = new THREE.DirectionalLight(0xffffff, 5);
+		dirLight.color.setHSL(0.1, 1, 0.95);
+		dirLight.position.set(0, 500, 300);
+		dirLight.castShadow = true;
+		dirLight.shadow.mapSize.width = 500;
+		dirLight.shadow.mapSize.height = 500;
+		let d = 800;
+		dirLight.shadow.camera.left = -d;
+		dirLight.shadow.camera.right = d;
+		dirLight.shadow.camera.top = d;
+		dirLight.shadow.camera.bottom = -d;
+
+		dirLight.shadow.camera.far = 3500;
+		dirLight.shadow.bias = -0.0001;
+
+		//const dirLightHelper = new THREE.DirectionalLightHelper(dirLight, 10);
+		//scene.add(dirLightHelper);
+		scene.add(dirLight);
+
+		const ambient = new THREE.AmbientLight(0x4466ff, 1);
+		scene.add(ambient);
+
+	}
+
+	function createWall() {
+		for (let i = 0; i < 2; i++) {
+			let cubeGeometry = new THREE.BoxGeometry(100, 200, 100);
+			let cubeMaterial = new THREE.MeshLambertMaterial({
+				color: 0x0000ff
+			});
+
+			let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+			//THREE.MathUtils.randFloatSpread(1000)
+			cube.position.x = 500 * (i > 0 ? 1 : -1);
+			cube.position.y = 100;
+			cube.position.z = 300;
+			//cube.layers.set(1);
+			//告诉立方体需要投射阴影
+			cube.castShadow = true;
+			scene.add(cube);
+			wallArr.push(cube);
+		}
+	}
+
+
+
+	function createBullet(id, pos) {
+		const geometry = new THREE.SphereGeometry(9, 50, 50);
+		//const material = new THREE.MeshBasicMaterial({ map: map });
+		const material = new THREE.MeshPhongMaterial({
+			color: 0xffffff, // 设置材质颜色
+			specular: 0x111111,
+			shininess: 99
+		});
+		let sphere = new THREE.Mesh(geometry, material);;
+		sphere.position.x = pos.x + 0;
+		sphere.position.y = 120;
+		sphere.position.z = pos.z + 50;
+		scene.add(sphere);
+		let bullet = {};
+		bullet.obj = sphere;
+		bullet.speed = 35;
+		bullet.angle = 0;
+		bullet.distance = 0;
+		bullet.alive = true;
+		bullet.id = id;
+		bulletArr.push(bullet)
+		if (outlinePass) {
+			selectedObjects = [];
+			selectedObjects.push(bullet.obj);
+			outlinePass.selectedObjects = selectedObjects;
+		}
+
+	}
+
+	function createMonster2() {
+		let r = monsterRadius;
+		let x = THREE.MathUtils.randFloatSpread(1000) - 500;
+		let y = 120;
+		let z = 1088;
+		const geometry = new THREE.SphereGeometry(r, 10, 10);
+		const material = new THREE.MeshPhongMaterial({
+			color: "#aa0000"
+		});
+		const group = new THREE.Group();
+		for (let i = -3; i <= 3; i++)
+			for (let j = -3; j <= 3; j++)
+				for (let m = -3; m <= 3; m++) {
+					if (Math.sqrt(i * i + j * j + m * m) > 3.5)
+						continue;
+
+					let ball = new THREE.Mesh(geometry, material)
+					ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
+					group.add(ball);
+				}
+		group.bom = false;
+		group.bomTimer = 0;
+		group.bomSpeed = 5;
+		group.alive = true;
+		group.speed = 5;
+		group.angle = 0;
+		group.distance = 0;
+		group.position.set(x, y, z);
+		scene.add(group);
+		monsterArr.push(group);
+		setTimeout(createMonster2, monsterDuration);
+	}
+
+	function bomMonster(monster) {
+		monster.traverse(function(obj) {
+			// 判断子对象是否是物体，如果是，更改其颜色
+			if (obj.isMesh) {
+				obj.material.color.set(0xff0000);
 			}
-	group.bom = false;
-	group.bomTimer = 0;
-	group.bomSpeed = 0.1;
-	group.alive = true;
-	group.speed = 0.1;
-	group.angle = 0;
-	group.distance = 0;
-	group.position.set(x, y, z);
-	scene.add(group);
-	monsterArr.push(group);
-	setTimeout(createMonster2, monsterDuration);
-}
-
-function bomMonster(monster) {
-	monster.traverse(function(obj) {
-		// 判断子对象是否是物体，如果是，更改其颜色
-		if (obj.isMesh) {
-			obj.material.color.set(0xff0000);
-		}
-	})
-	console.log(monster.position);
-	monster.bom = true;
-	monster.alive = false;
-}
+		})
+		monster.bom = true;
+		monster.alive = false;
+	}
 
 
-function loadAvatar(player, pos) {
-	return new Promise((resolve, reject) => {
-		if (theModel.type == "fbx") {
-			loader = new FBXLoader();
-		} else {
-			loader = new GLTFLoader();
-		}
+
+	const actionUrls = ["./model/walkforward.fbx",
+		"./model/walkbackward.fbx",
+		"./model/walkleft.fbx",
+		"./model/walkright.fbx",
+		"./model/idle.fbx",
+		"./model/jumping.fbx",
+		"./model/shooting.fbx",
+		"./model/death.fbx"
+	];
+
+	let clipActions = [];
+
+	function loadAvatar(player, pos) {
+
+
 		loader.crossOrigin = "anonymous";
 		loader.load(
 			theModel.path,
@@ -369,606 +382,642 @@ function loadAvatar(player, pos) {
 					model = gltf;
 					player.model = model;
 				}
-				player.model.position.set(pos.x, pos.y, pos.z);
-				player.skeletonHelper = new THREE.SkeletonHelper(player.model);
-				player.skeletonHelper.visible = false;
-				player.skeletonHelper.material.linewidth = 30;
+				initPlayer(player, pos);
 
-				scene.add(player.skeletonHelper);
+				let resIndex = 0;
 
-				player.model.castShadow = true;
-				player.model.children.forEach(child => {
-					child.castShadow = true;
-					child.receiveShadow = true;
-				});
-				scene.add(player.model);
-				player.avatarRotY = player.model.rotation.y;
+				function loadRes() {
 
-				const geometry = new THREE.CircleGeometry(0.6, 32, 0, Math.PI * 2);
-				let color = player.id == 1 ? 0xff0000 : 0x0000ff;
-				const material = new THREE.MeshBasicMaterial({
-					color: color,
-					side: THREE.DoubleSide,
-					transparent: true,
-					opacity: 0.4
-				});
-				const circle = new THREE.Mesh(geometry, material);
-				circle.position.y = 0.1;
-				circle.position.x = pos.x;
-				circle.position.z = pos.z;
-				circle.rotation.x = Math.PI / 2;
-				player.circle = circle;
-				scene.add(circle);
+					const resFile = actionUrls[resIndex];
+
+					loader.load(resFile, function(obj) {
+
+						clipActions.push(obj.animations[0]);
+
+						resIndex++;
+
+						if (resIndex < actionUrls.length) {
+
+							loadRes();
+
+						} else {
+
+							beginGame();
+
+						}
+
+					}, onProgress, null);
+
+				}
+
+				loadRes();
 
 
-				resolve(1)
 			},
 
-			// called while loading is progressing
-			(progress) =>
-			console.log(
-				"Loading model...", 100.0 * (progress.loaded / progress.total), "%"
-			),
+			onProgress,
 
 			// called when loading has errors
 			(error) => {
-				reject(1);
+
 				app.failed = true;
 				console.log(error);
 			}
 		);
-	});
+	}
 
-}
+	function beginGame() {
+		player2.model = SkeletonUtils.clone(player1.model);
+		initPlayer(player2, new THREE.Vector3(100, 0, 0))
+		if (!app.doublePlayer) {
+			player2.model.visible = false;
+			player2.foot.visible = false;
+		}
 
-function setHelper() {
-	// helpers
-	//const gridHelper = new THREE.GridHelper(50, 50);
-	//gridHelper.receiveShadow = true;
-	//scene.add(gridHelper);
 
-	const axesHelper = new THREE.AxesHelper(500);
-	scene.add(axesHelper);
-}
+		player1.animationMixer = new THREE.AnimationMixer(player1.model);
+		player2.animationMixer = new THREE.AnimationMixer(player2.model);
+		player1.actions["walk_forward"] = player1.animationMixer.clipAction(clipActions[0]);
+		player2.actions["walk_forward"] = player2.animationMixer.clipAction(clipActions[0]);
+		player1.actions["walk_backward"] = player1.animationMixer.clipAction(clipActions[1]);
+		player2.actions["walk_backward"] = player2.animationMixer.clipAction(clipActions[1]);
+		player1.actions["walk_left"] = player1.animationMixer.clipAction(clipActions[2]);
+		player2.actions["walk_left"] = player2.animationMixer.clipAction(clipActions[2]);
+		player1.actions["walk_right"] = player1.animationMixer.clipAction(clipActions[3]);
+		player2.actions["walk_right"] = player2.animationMixer.clipAction(clipActions[3]);
+		player1.actions["idle"] = player1.animationMixer.clipAction(clipActions[4]);
+		player2.actions["idle"] = player2.animationMixer.clipAction(clipActions[4]);
+		player1.actions["jump"] = player1.animationMixer.clipAction(clipActions[5]);
+		player2.actions["jump"] = player2.animationMixer.clipAction(clipActions[5]);
+		player1.actions["shoot"] = player1.animationMixer.clipAction(clipActions[6]);
+		player2.actions["shoot"] = player2.animationMixer.clipAction(clipActions[6]);
+		player1.actions["death"] = player1.animationMixer.clipAction(clipActions[7]);
+		player2.actions["death"] = player2.animationMixer.clipAction(clipActions[7]);
 
-function getCenter(obj) {
-	const selectedDecorationBbox = new THREE.Box3().setFromObject(obj);
-	let center = new THREE.Vector3();
-	let midPoint = selectedDecorationBbox.getCenter(center);
-}
-
-function loadActions() {
-	let loader = new FBXLoader();
-	player1.animationMixer = new THREE.AnimationMixer(player1.model);
-	player2.animationMixer = new THREE.AnimationMixer(player2.model);
-	loader.load('./model/walkforward.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			player1.actions["walk_forward"] = player1.animationMixer.clipAction(clip);
-			player2.actions["walk_forward"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	loader.load('./model/walkbackward.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			player1.actions["walk_backward"] = player1.animationMixer.clipAction(clip);
-			player2.actions["walk_backward"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	loader.load('./model/walkleft.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			//actions["walk_left"] = animationMixer.clipAction(clip);
-			player1.actions["walk_left"] = player1.animationMixer.clipAction(clip);
-			player2.actions["walk_left"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	loader.load('./model/walkright.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			//actions["walk_right"] = animationMixer.clipAction(clip);
-			player1.actions["walk_right"] = player1.animationMixer.clipAction(clip);
-			player2.actions["walk_right"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	loader.load('./model/idle.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			//actions["idle"] = animationMixer.clipAction(clip);
-			player1.actions["idle"] = player1.animationMixer.clipAction(clip);
-			player2.actions["idle"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-
-	loader.load('./model/jumping.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			//actions["jump"] = animationMixer.clipAction(clip);
-			player1.actions["jump"] = player1.animationMixer.clipAction(clip);
-			player2.actions["jump"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	loader.load('./model/shooting.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			//actions["shoot"] = animationMixer.clipAction(clip);
-			player1.actions["shoot"] = player1.animationMixer.clipAction(clip);
-			player2.actions["shoot"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	loader.load('./model/death.fbx', function(gltf) {
-		gltf.animations.forEach((clip) => {
-			//console.log(clip)
-			//actions["death"] = animationMixer.clipAction(clip);
-			player1.actions["death"] = player1.animationMixer.clipAction(clip);
-			player2.actions["death"] = player2.animationMixer.clipAction(clip);
-		});
-
-	});
-	setTimeout(() => {
 		app.loaded = true;
-		console.log(player1.actions["shoot"]);
 		player1.actions["idle"].play();
 		player2.actions["idle"].play();
 		player1.currentAction = player1.actions["idle"];
 		player1.currentActionName = "idle";
 		player2.currentAction = player2.actions["idle"];
 		player2.currentActionName = "idle";
-	}, 3000)
+		createMonster2();
+		animate();
 
-}
+	}
 
-function switchAction(player, newActionName, fadeDuration = 0.1) {
-	console.log("switch to action " + newActionName, player.id)
-	const newAction = player.actions[newActionName];
-	if (newAction && player.currentAction !== newAction) {
-		player.previousAction = player.currentAction;
-		if (player.previousAction) {
-			player.previousAction.fadeOut(fadeDuration);
+	function initPlayer(player, pos) {
+		player.model.position.set(pos.x, pos.y, pos.z);
+		player.skeletonHelper = new THREE.SkeletonHelper(player.model);
+		player.skeletonHelper.visible = false;
+		player.skeletonHelper.material.linewidth = 30;
+
+		scene.add(player.skeletonHelper);
+
+		player.model.castShadow = true;
+		player.model.children.forEach(child => {
+			child.castShadow = true;
+		});
+		scene.add(player.model);
+		player.avatarRotY = player.model.rotation.y;
+
+		const geometry = new THREE.CircleGeometry(40, 32, 0, Math.PI * 2);
+		let color = player.id == 1 ? 0xff0000 : 0x0000ff;
+		const material = new THREE.MeshBasicMaterial({
+			color: color,
+			side: THREE.DoubleSide,
+			transparent: true,
+			opacity: 0.4
+		});
+		const circle = new THREE.Mesh(geometry, material);
+		circle.position.y = 0.1;
+		circle.position.x = pos.x;
+		circle.position.z = pos.z;
+		circle.rotation.x = Math.PI / 2;
+		player.foot = circle;
+		scene.add(circle);
+	}
+
+	function setHelper() {
+		//const axesHelper = new THREE.AxesHelper(500);
+		//scene.add(axesHelper);
+	}
+
+	function getCenter(obj) {
+		const selectedDecorationBbox = new THREE.Box3().setFromObject(obj);
+		let center = new THREE.Vector3();
+		let midPoint = selectedDecorationBbox.getCenter(center);
+	}
+
+
+	function onProgress(xhr) {
+
+		if (xhr.lengthComputable) {
+
+			const percentComplete = xhr.loaded / xhr.total * 100;
+			console.log(Math.round(percentComplete, 2) + '% downloaded');
+
 		}
 
-		if (newActionName === 'jump' || newActionName === 'death' ||
-			newActionName === 'walk_forward' || newActionName === 'shoot' ||
-			newActionName === 'walk_backward' || newActionName === 'walk_left' ||
-			newActionName === 'walk_right') {
-			newAction.loop = THREE.LoopOnce;
-			newAction.clampWhenFinished = true;
+	}
+
+	function switchAction(player, newActionName, fadeDuration = 0.1) {
+		console.log("switch to action " + newActionName, player.id)
+		const newAction = player.actions[newActionName];
+		if (newAction && player.currentAction !== newAction) {
+			player.previousAction = player.currentAction;
+			if (player.previousAction) {
+				player.previousAction.fadeOut(fadeDuration);
+			}
+
+			if (newActionName === 'jump' || newActionName === 'death' ||
+				newActionName === 'walk_forward' || newActionName === 'shoot' ||
+				newActionName === 'walk_backward' || newActionName === 'walk_left' ||
+				newActionName === 'walk_right') {
+				newAction.loop = THREE.LoopOnce;
+				newAction.clampWhenFinished = true;
+			}
+
+			player.currentAction = newAction;
+
+			player.currentAction.reset();
+			if (newActionName === 'shoot')
+				player.currentAction.setEffectiveTimeScale(4);
+			else
+				player.currentAction.setEffectiveTimeScale(2);
+			player.currentAction.setEffectiveWeight(1);
+			player.currentAction.fadeIn(fadeDuration).play();
+		} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
+			//console.log("need to fire");
 		}
-
-		player.currentAction = newAction;
-
-		player.currentAction.reset();
-		if (newActionName === 'shoot')
-			player.currentAction.setEffectiveTimeScale(4);
-		else
-			player.currentAction.setEffectiveTimeScale(2);
-		player.currentAction.setEffectiveWeight(1);
-		player.currentAction.fadeIn(fadeDuration).play();
-	} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
-		//console.log("need to fire");
 	}
-}
 
-function setFloor() {
-	const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 4000, 4000 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
-	mesh.rotation.x = - Math.PI / 2;
-	mesh.receiveShadow = true;
-	scene.add( mesh );
-	const grid = new THREE.GridHelper( 4000, 20, 0x000000, 0x000000 );
-	grid.material.opacity = 0.2;
-	grid.material.transparent = true;
-	scene.add( grid );
-}
-
-
-
-function toggleShow(k, obj) {
-	console.log(k);
-	if (
-		obj
-		.querySelector(".mdui-list-item-content")
-		.innerText.includes('hide')
-	) {
-		scene.getObjectByName(k).visible = false;
-		obj.querySelector(".mdui-list-item-content").innerText =
-			'show' +
-			obj
-			.querySelector(".mdui-list-item-content")
-			.innerText.substr(
-				'hide'.length
-			);
-	} else {
-		scene.getObjectByName(k).visible = true;
-		obj.querySelector(".mdui-list-item-content").innerText =
-			'hide' +
-			obj
-			.querySelector(".mdui-list-item-content")
-			.innerText.substr(
-				'show'.length
-			);
+	function setFloor() {
+		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshPhongMaterial({
+			color: 0x999999,
+			depthWrite: false
+		}));
+		mesh.rotation.x = -Math.PI / 2;
+		mesh.receiveShadow = true;
+		scene.add(mesh);
+		const grid = new THREE.GridHelper(4000, 20, 0x000000, 0x000000);
+		grid.material.opacity = 0.2;
+		grid.material.transparent = true;
+		scene.add(grid);
 	}
-}
-
-
-const renderer = new THREE.WebGLRenderer({
-	antialias: true
-});
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(
-	document.querySelector("#model").clientWidth,
-	document.querySelector("#model").clientHeight
-);
-renderer.shadowMap.enabled = true;
-
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-//renderer.autoClear = false;
-renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
-//ReinhardToneMapping
-renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
-renderer.toneMappingExposure = 0.9; // 色调映射曝光
-renderer.setPixelRatio(window.devicePixelRatio);
-//renderer.setClearColor(0x000000, 1); //设置背景颜色
-document.querySelector("#model").appendChild(renderer.domElement);
-const stats = new Stats();
-stats.showPanel(0);
-document.querySelector('#model').appendChild(stats.domElement);
 
 
 
 
-// camera
-const camera = new THREE.PerspectiveCamera(
-	50,
-	document.querySelector("#model").clientWidth /
-	document.querySelector("#model").clientHeight,
-	1,
-	5000.0
-);
-camera.position.set(0, 200, -1000);
-camera.lookAt(0, 0, 0);
+	const renderer = new THREE.WebGLRenderer({
+		antialias: true
+	});
+	renderer.setPixelRatio(window.devicePixelRatio);
+	renderer.setSize(
+		document.querySelector("#model").clientWidth,
+		document.querySelector("#model").clientHeight
+	);
+	renderer.shadowMap.enabled = true;
 
-composer = new EffectComposer(renderer);
-const renderPass = new RenderPass(scene, camera);
-// 给EffectComposer添加一个渲染器通道 
-composer.addPass(renderPass);
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-
-const v2 = new THREE.Vector2(document.querySelector("#model").clientWidth,
-	document.querySelector("#model").clientHeight);
-// OutlinePass第一个参数的尺寸和canvas画布保持一致
-outlinePass = new OutlinePass(v2, scene, camera);
-outlinePass.visibleEdgeColor.set(0xFFFFFF); // 可见边框颜色
-outlinePass.hiddenEdgeColor.set(0x0000FF); // 隐藏边框颜色
-outlinePass.edgeStrength = 5; // 高亮描边发光强度
-outlinePass.edgeGlow = 0.1; // 光晕[0,1] 
-outlinePass.edgeThickness = 2; // 高亮发光描边厚度(边缘宽度) 
-outlinePass.pulsePeriod = 2; // 模型闪烁频率控制
-outlinePass.renderToScreen = true; // 设置这个参数的目的是马上将当前的内容输出
-// 将OutlinePass通道添加到后处理composer中
-composer.addPass(outlinePass);
-
-let gammaPass = new ShaderPass(THREE.GammaCorrectionShader);
-gammaPass.renderToScreen = true;
-composer.addPass(gammaPass);
-outlinePass.selectedObjects = [];
+	//renderer.autoClear = false;
+	renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
+	//ReinhardToneMapping
+	renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
+	renderer.toneMappingExposure = 0.9; // 色调映射曝光
+	renderer.setPixelRatio(window.devicePixelRatio);
+	//renderer.setClearColor(0x000000, 1); //设置背景颜色
+	document.querySelector("#model").appendChild(renderer.domElement);
+	const stats = new Stats();
+	stats.showPanel(0);
+	document.querySelector('#model').appendChild(stats.domElement);
 
 
-window.addEventListener(
-	"resize",
-	function() {
-		camera.aspect =
-			document.querySelector("#model").clientWidth /
-			document.querySelector("#model").clientHeight;
-		camera.updateProjectionMatrix();
-		renderer.setSize(
-			document.querySelector("#model").clientWidth,
-			document.querySelector("#model").clientHeight
-		);
-	},
-	false
-);
 
 
-// scene
+	// camera
+	const camera = new THREE.PerspectiveCamera(
+		50,
+		document.querySelector("#model").clientWidth /
+		document.querySelector("#model").clientHeight,
+		1,
+		5000.0
+	);
+	camera.position.set(0, 200, -1000);
+	camera.lookAt(0, 0, 0);
 
-setBackground();
-setFloor();
-let a = await loadAvatar(player1, new THREE.Vector3(-100, 0, 0));
-let b = await loadAvatar(player2, new THREE.Vector3(100, 0, 0));
-if (!app.doublePlayer) player2.model.visible = false;
-player2.model.traverse(function(obj) {
-	// 判断子对象是否是物体，如果是，更改其颜色
-	if (obj.isMesh) {
-		obj.material = new THREE.MeshPhongMaterial({
-			color: 0x0000ff, // 设置材质颜色
-			specular: 0xffffff, // 设置高光颜色
-			shininess: 100, // 设置高光强度
-			combine: THREE.MixOperation, // 设置环境映射的混合模式
-			reflectivity: 1 // 设置材质的反射强度
+	composer = new EffectComposer(renderer);
+
+	const renderPass = new RenderPass(scene, camera);
+	composer.addPass(renderPass);
+
+	outlinePass = new OutlinePass(new THREE.Vector2(document.querySelector("#model").clientWidth, document
+		.querySelector("#model").clientHeight), scene, camera);
+	outlinePass.edgeStrength = 8;
+	outlinePass.edgeGlow = 1;
+	outlinePass.visibleEdgeColor.set("#ff0000");
+	outlinePass.edgeThickness = 4;
+	outlinePass.pulsePeriod = 2;
+	composer.addPass(outlinePass);
+
+	const outputPass = new OutputPass();
+	composer.addPass(outputPass);
+
+	effectFXAA = new ShaderPass(FXAAShader);
+	effectFXAA.uniforms['resolution'].value.set(1 / document.querySelector("#model").clientWidth, 1 / document
+		.querySelector("#model").clientHeight);
+	composer.addPass(effectFXAA);
+	outlinePass.selectedObjects = [];
+
+
+	window.addEventListener(
+		"resize",
+		function() {
+			camera.aspect =
+				document.querySelector("#model").clientWidth /
+				document.querySelector("#model").clientHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(
+				document.querySelector("#model").clientWidth,
+				document.querySelector("#model").clientHeight
+			);
+		},
+		false
+	);
+
+
+	// scene
+
+	setBackground();
+	setFloor();
+	setLight();
+	setHelper();
+	setControll();
+	createWall();
+	loadAvatar(player1, new THREE.Vector3(-100, 0, 0));
+
+	let colors = ["red", "blue", "green"];
+	const params = {
+		showPlayer1Skeleton: false,
+		showPlayer2Skeleton: false,
+		player1Color: "none",
+		player2Color: "none",
+		player1Halo: true,
+		player2Halo: true,
+	};
+	const gui = new GUI({
+		width: 280
+	});
+	gui.domElement.id = 'gui';
+	gui.domElement.style.marginTop = '450px';
+
+	gui.add(params, 'showPlayer1Skeleton').onChange(function(value) {
+
+		player1.skeletonHelper.visible = value;
+
+	});
+	gui.add(params, 'player1Halo').onChange(function(value) {
+
+		player1.foot.visible = value;
+
+	});
+	gui.add(params, 'player1Color', colors).onChange(function(value) {
+
+		//player1.skeletonHelper.visible = value;
+		player1.model.traverse(function(obj) {
+			// 判断子对象是否是物体，如果是，更改其颜色
+			if (obj.isMesh) {
+				obj.material = new THREE.MeshPhongMaterial({
+					color: value, // 设置材质颜色
+					specular: 0xffffff, // 设置高光颜色
+					shininess: 100, // 设置高光强度
+					combine: THREE.MixOperation, // 设置环境映射的混合模式
+					reflectivity: 1 // 设置材质的反射强度
+				});
+			}
+		});
+
+	});
+
+	if (app.doublePlayer) {
+		gui.add(params, 'showPlayer2Skeleton').onChange(function(value) {
+
+			player2.skeletonHelper.visible = value;
+
+		});
+		gui.add(params, 'player2Halo').onChange(function(value) {
+
+			player2.foot.visible = value;
+
+		});
+		gui.add(params, 'player2Color', colors).onChange(function(value) {
+
+			//player1.skeletonHelper.visible = value;
+			player2.model.traverse(function(obj) {
+				// 判断子对象是否是物体，如果是，更改其颜色
+				if (obj.isMesh) {
+					obj.material = new THREE.MeshPhongMaterial({
+						color: value, // 设置材质颜色
+						specular: 0xffffff, // 设置高光颜色
+						shininess: 100, // 设置高光强度
+						combine: THREE.MixOperation, // 设置环境映射的混合模式
+						reflectivity: 1 // 设置材质的反射强度
+					});
+				}
+			});
+
 		});
 	}
-})
-loadActions();
-//createMonster2();
-setLight();
-setHelper();
-setControll();
-createWall();
 
-function handleActions(player) {
-	if (
-		(player.currentAction === player.actions['walk_forward'] || player.currentAction === player.actions[
-				'jump'] ||
-			player.currentAction === player.actions['shoot'] || player.currentAction === player.actions[
-				'walk_backward'] ||
-			player.currentAction === player.actions['walk_left'] || player.currentAction === player.actions[
-				'walk_right']) &&
-		player.currentAction.time >= player.currentAction.getClip().duration
-	) {
-		//console.log(player.id);
-		if (player.currentAction === player.actions['shoot'])
-			createBullet(player.model.position);
-		switchAction(player, 'idle', 0.1);
-	}
-	// 当处于 running 动作时，移动相机
-	let playerBox = new THREE.Box3().setFromObject(player.model);
-	let canMove = true;
-	if (
-		player.currentAction === player.actions['walk_forward']
-	) {
-		wallArr.forEach(wall => {
-			if (wall.position.z > player.model.position.z) {
-				let wallMeshBox = new THREE.Box3().setFromObject(wall);
-				if (wallMeshBox.intersectsBox(playerBox)) {
-					canMove = false;
-				}
-			}
-		})
-		if (canMove) {
-			let dz = 2;
-			player.model.position.z += dz;
-			player.circle.position.z = player.model.position.z;
-		}
-	}
-	if (
-		player.currentAction === player.actions['walk_backward']
-	) {
-		wallArr.forEach(wall => {
-			if (wall.position.z < player.model.position.z) {
-				let wallMeshBox = new THREE.Box3().setFromObject(wall);
-				if (wallMeshBox.intersectsBox(playerBox)) {
-					canMove = false;
-				}
-			}
-		})
-		if (canMove) {
-			let dz = -2;
-			player.model.position.z += dz;
-			player.circle.position.z = player.model.position.z;
-		}
-	}
-	if (
-		player.currentAction === player.actions['walk_left']
-	) {
-		wallArr.forEach(wall => {
-			if (wall.position.x > player.model.position.x) {
-				let wallMeshBox = new THREE.Box3().setFromObject(wall);
-				if (wallMeshBox.intersectsBox(playerBox)) {
-					canMove = false;
-				}
-			}
-		})
-		if (canMove) {
-			let dx = 2;
-			player.model.position.x += dx;
-			player.circle.position.x = player.model.position.x;
-		}
-	}
-	if (
-		player.currentAction === player.actions['walk_right']
-	) {
-		wallArr.forEach(wall => {
-			if (wall.position.x < player.model.position.x) {
-				let wallMeshBox = new THREE.Box3().setFromObject(wall);
-				if (wallMeshBox.intersectsBox(playerBox)) {
-					canMove = false;
-				}
-			}
-		})
-		if (canMove) {
-			let dx = -2;
-			player.model.position.x += dx;
-			player.circle.position.x = player.model.position.x;
-		}
-	}
-}
 
-function animate() {
 
-	let bulletList = [];
-	bulletArr.forEach(item => {
-		if (item.alive && item.distance < 30)
-			bulletList.push(item);
-		else
-			scene.remove(item.obj)
-	});
-	bulletArr = bulletList;
-	bulletArr.forEach(item => {
-		if (item.alive) {
-			let dx = item.speed * Math.sin(item.angle);
-			let dz = item.speed * Math.cos(item.angle);
-			item.obj.position.x += dx;
-			item.obj.position.z += dz;
-			item.distance += item.speed;
-		}
-	});
 
-	let monsterList = [];
-	monsterArr.forEach(item => {
-		if (item.alive) {
-			if (item.distance < 200) {
-				monsterList.push(item);
-			} else {
-				scene.remove(item);
-				item = null;
-			}
+	function handleActions(player) {
+		if (
+			(player.currentAction === player.actions['walk_forward'] || player.currentAction === player.actions[
+					'jump'] ||
+				player.currentAction === player.actions['shoot'] || player.currentAction === player.actions[
+					'walk_backward'] ||
+				player.currentAction === player.actions['walk_left'] || player.currentAction === player.actions[
+					'walk_right']) &&
+			player.currentAction.time >= player.currentAction.getClip().duration
+		) {
+			//console.log(player.id);
+			if (player.currentAction === player.actions['shoot'])
+				createBullet(player.id, player.model.position);
+			switchAction(player, 'idle', 0.1);
 		}
-		if (item && item.bom) {
-			if (item.bomTimer < 30) {
-				monsterList.push(item);
-			} else {
-				scene.remove(item);
-				item = null;
-			}
-		}
-	});
-	monsterArr = monsterList;
-
-	monsterArr.forEach(item => {
-		if (item.alive) {
-			let dx = item.speed * Math.sin(item.angle);
-			let dz = item.speed * Math.cos(item.angle);
-			item.translateZ(-dz);
-			item.translateX(dx);
-			//item.rotation.x += 0.01;
-			//item.rotation.z += 0.01;
-			item.distance += item.speed;
-		}
-		if (item.bom) {
-			item.traverse(function(child) {
-				// 判断子对象是否是物体，如果是，更改其颜色
-				if (child.isMesh) {
-					let dir = new THREE.Vector3().copy(child.position.clone().normalize())
-					//console.log(dir);
-					let dx = dir.x * item.bomSpeed;
-					let dy = dir.y * item.bomSpeed;
-					let dz = dir.z * item.bomSpeed;
-					child.position.x += dx;
-					child.position.y += dy;
-					child.position.z += dz;
+		// 当处于 running 动作时，移动相机
+		let playerBox = new THREE.Box3().setFromObject(player.model);
+		let canMove = true;
+		if (
+			player.currentAction === player.actions['walk_forward']
+		) {
+			wallArr.forEach(wall => {
+				if (wall.position.z > player.model.position.z) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
 				}
 			})
-			item.bomTimer += 1;
-		}
-	});
-
-	let delta = clock.getDelta();
-	if (player1.animationMixer != null) {
-		player1.animationMixer.update(delta);
-	}
-	if (app.doublePlayer && player2.animationMixer != null) {
-		player2.animationMixer.update(delta);
-	}
-	handleActions(player1);
-	if (app.doublePlayer)
-		handleActions(player2);
-
-	// check collide
-	let playerBox = new THREE.Box3().setFromObject(player1.model);
-	monsterArr.forEach(item => {
-		if (item.alive) {
-			let boxMeshBox = new THREE.Box3().setFromObject(item);
-			if (playerBox.intersectsBox(boxMeshBox)) {
-				player1.life -= 2;
-				bomMonster(item);
+			if (canMove) {
+				let dz = 2;
+				player.model.position.z += dz;
+				player.circle.position.z = player.model.position.z;
 			}
+		}
+		if (
+			player.currentAction === player.actions['walk_backward']
+		) {
+			wallArr.forEach(wall => {
+				if (wall.position.z < player.model.position.z) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dz = -2;
+				player.model.position.z += dz;
+				player.circle.position.z = player.model.position.z;
+			}
+		}
+		if (
+			player.currentAction === player.actions['walk_left']
+		) {
+			wallArr.forEach(wall => {
+				if (wall.position.x > player.model.position.x) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dx = 2;
+				player.model.position.x += dx;
+				player.circle.position.x = player.model.position.x;
+			}
+		}
+		if (
+			player.currentAction === player.actions['walk_right']
+		) {
+			wallArr.forEach(wall => {
+				if (wall.position.x < player.model.position.x) {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(playerBox)) {
+						canMove = false;
+					}
+				}
+			})
+			if (canMove) {
+				let dx = -2;
+				player.model.position.x += dx;
+				player.circle.position.x = player.model.position.x;
+			}
+		}
+	}
+
+	function animate() {
+
+		let bulletList = [];
+		bulletArr.forEach(item => {
+			if (item.alive && item.distance < 2000)
+				bulletList.push(item);
+			else
+				scene.remove(item.obj)
+		});
+		bulletArr = bulletList;
+		bulletArr.forEach(item => {
+			if (item.alive) {
+				let dx = item.speed * Math.sin(item.angle);
+				let dz = item.speed * Math.cos(item.angle);
+				item.obj.position.x += dx;
+				item.obj.position.z += dz;
+				item.distance += item.speed;
+			}
+		});
+
+		let monsterList = [];
+		monsterArr.forEach(item => {
+			if (item.alive) {
+				if (item.distance < 1500) {
+					monsterList.push(item);
+				} else {
+					scene.remove(item);
+					item = null;
+				}
+			}
+			if (item && item.bom) {
+				if (item.bomTimer < 30) {
+					monsterList.push(item);
+				} else {
+					scene.remove(item);
+					item = null;
+				}
+			}
+		});
+		monsterArr = monsterList;
+
+		monsterArr.forEach(item => {
+			if (item.alive) {
+				let dx = item.speed * Math.sin(item.angle);
+				let dz = item.speed * Math.cos(item.angle);
+				item.translateZ(-dz);
+				item.translateX(dx);
+
+				item.distance += item.speed;
+			}
+			if (item.bom) {
+				item.traverse(function(child) {
+					// 判断子对象是否是物体，如果是，更改其颜色
+					if (child.isMesh) {
+						let dir = new THREE.Vector3().copy(child.position.clone().normalize())
+						//console.log(dir);
+						let dx = dir.x * item.bomSpeed;
+						let dy = dir.y * item.bomSpeed;
+						let dz = dir.z * item.bomSpeed;
+						child.position.x += dx;
+						child.position.y += dy;
+						child.position.z += dz;
+					}
+				})
+				item.bomTimer += 1;
+			}
+		});
+
+		let delta = clock.getDelta();
+		if (player1.animationMixer != null) {
+			player1.animationMixer.update(delta);
+		}
+		if (app.doublePlayer && player2.animationMixer != null) {
+			player2.animationMixer.update(delta);
+		}
+		handleActions(player1);
+		if (app.doublePlayer)
+			handleActions(player2);
+
+		// check collide
+		let playerBox = new THREE.Box3().setFromObject(player1.model);
+		let playerBox2 = null;
+		if (app.doublePlayer)
+			playerBox2 = new THREE.Box3().setFromObject(player2.model);
+		monsterArr.forEach(item => {
+			if (item.alive) {
+				let boxMeshBox = new THREE.Box3().setFromObject(item);
+				if (playerBox.intersectsBox(boxMeshBox)) {
+					player1.life -= 2;
+					bomMonster(item);
+				}
+				if (playerBox2 && playerBox2.intersectsBox(boxMeshBox)) {
+					player2.life -= 2;
+					bomMonster(item);
+				}
+				wallArr.forEach(wall => {
+					let wallMeshBox = new THREE.Box3().setFromObject(wall);
+					if (wallMeshBox.intersectsBox(boxMeshBox)) {
+						bomMonster(item);
+					}
+				})
+				bulletArr.forEach(bullet => {
+					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
+					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
+						bullet.alive = false;
+						console.log("player ", bullet.id, " score");
+						if (bullet.id == 1) {
+							player1.score += 1;
+						} else {
+							player2.score += 1;
+						}
+						bomMonster(item);
+					}
+				})
+			}
+
+		});
+		bulletArr.forEach(bullet => {
+			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 			wallArr.forEach(wall => {
 				let wallMeshBox = new THREE.Box3().setFromObject(wall);
-				if (wallMeshBox.intersectsBox(boxMeshBox)) {
-					bomMonster(item);
-				}
-			})
-			bulletArr.forEach(bullet => {
-				let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
-				if (bulletMeshBox.intersectsBox(boxMeshBox)) {
+				if (wallMeshBox.intersectsBox(bulletMeshBox)) {
 					bullet.alive = false;
-					bomMonster(item);
 				}
 			})
-		}
-
-	});
-	bulletArr.forEach(bullet => {
-		let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
-		wallArr.forEach(wall => {
-			let wallMeshBox = new THREE.Box3().setFromObject(wall);
-			if (wallMeshBox.intersectsBox(bulletMeshBox)) {
-				bullet.alive = false;
-			}
 		})
-	})
 
-	app.player1Life = player1.life;
-	uniforms.iTime.value += 0.05;
-	stats.update();
+		app.player1Life = player1.life;
+		app.player1Score = player1.score;
+		app.player2Life = player2.life;
+		app.player2Score = player2.score;
+		uniforms.iTime.value += 0.05;
+		stats.update();
 
-	//composer.render()
-
-	renderer.render(scene, camera)
-	requestAnimationFrame(animate);
-}
-
-animate();
-
-
-
-// keyborad control camera position
-document.addEventListener("keydown", (event) => {
-	//console.log(event);
-	let step = 0.01;
-	//ArrowLeft ArrowRight
-	switch (event.key) {
-		case "w":
-			//camera.position.set(x + step, y, z);
-			switchAction(player1, 'walk_forward');
-			break;
-		case "a":
-			switchAction(player1, 'walk_left');
-			//avatar.rotation.y = avatarRotY;
-			break;
-		case "d":
-			switchAction(player1, 'walk_right');
-			//avatar.rotation.y = avatarRotY;
-			break;
-		case "s":
-			switchAction(player1, 'walk_backward');
-			//avatar.rotation.y = avatarRotY;
-			break;
-		case "j":
-			switchAction(player1, 'shoot');
-			break;
-		case "k":
-			switchAction(player1, 'jump');
-			break;
-
-		case "ArrowRight":
-			switchAction(player2, 'walk_right');
-			break;
-
-		case "ArrowLeft":
-			switchAction(player2, 'walk_left');
-			break;
-
-		case "ArrowUp":
-			switchAction(player2, 'walk_forward');
-			break;
-
-		case "ArrowDown":
-			switchAction(player2, 'walk_backward');
-			break;
-		case "1":
-			switchAction(player2, 'shoot');
-			break;
-		case "2":
-			switchAction(player2, 'jump');
-			break;
+		let needCompose = false;
+		if (bulletArr.length > 0)
+			needCompose = true;
+		if (false)
+			composer.render();
+		else
+			renderer.render(scene, camera);
+		requestAnimationFrame(animate);
 	}
-});
+
+
+
+
+	// keyborad control camera position
+	document.addEventListener("keydown", (event) => {
+		//console.log(event);
+		let step = 0.01;
+		//ArrowLeft ArrowRight
+		switch (event.key) {
+			case "w":
+				//camera.position.set(x + step, y, z);
+				switchAction(player1, 'walk_forward');
+				break;
+			case "a":
+				switchAction(player1, 'walk_left');
+				//avatar.rotation.y = avatarRotY;
+				break;
+			case "d":
+				switchAction(player1, 'walk_right');
+				//avatar.rotation.y = avatarRotY;
+				break;
+			case "s":
+				switchAction(player1, 'walk_backward');
+				//avatar.rotation.y = avatarRotY;
+				break;
+			case "j":
+				switchAction(player1, 'shoot');
+				break;
+			case "k":
+				switchAction(player1, 'jump');
+				break;
+
+			case "ArrowRight":
+				switchAction(player2, 'walk_right');
+				break;
+
+			case "ArrowLeft":
+				switchAction(player2, 'walk_left');
+				break;
+
+			case "ArrowUp":
+				switchAction(player2, 'walk_forward');
+				break;
+
+			case "ArrowDown":
+				switchAction(player2, 'walk_backward');
+				break;
+			case "1":
+				switchAction(player2, 'shoot');
+				break;
+			case "2":
+				switchAction(player2, 'jump');
+				break;
+		}
+	});
+}
