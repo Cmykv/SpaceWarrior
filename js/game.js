@@ -31,6 +31,13 @@ import {
 	FXAAShader
 } from 'three/addons/shaders/FXAAShader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+import {
+	GestureRecognizer,
+	FilesetResolver,
+	DrawingUtils
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
 const theModel = {
 	"name": "Vanguard",
 	"path": "model/Vanguard.fbx",
@@ -72,6 +79,122 @@ document.getElementById("btn_start_2").onclick = () => {
 	modal.style.display = "none";
 	init();
 }
+document.getElementById("btn_set").onclick = () => {
+	useHandpose();
+}
+
+
+function simulateKeyDown(keyCode) {
+  var event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    keyCode: keyCode,
+	key:keyCode
+  });
+  document.dispatchEvent(event);
+}
+
+function useHandpose() {
+	const canvasElement = document.getElementById("output_canvas");
+	const canvasCtx = canvasElement.getContext("2d");
+	let gestureRecognizer;
+	let runningMode = "VIDEO";
+
+	const createGestureRecognizer = async () => {
+		const vision = await FilesetResolver.forVisionTasks(
+			"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+		);
+		gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+			baseOptions: {
+				modelAssetPath:
+					//"https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+					"./app/shared/models/gesture_recognizer.task",
+				delegate: "GPU"
+			},
+			runningMode: runningMode
+		});
+
+	};
+	createGestureRecognizer();
+
+	let lastVideoTime = -1;
+	async function predictWebcam() {
+		let results = undefined;
+		let nowInMs = Date.now();
+		//console.log(videoElement.currentTime-lastVideoTime,nowInMs);
+		if (videoElement.currentTime !== lastVideoTime && (videoElement.currentTime-lastVideoTime)>0.08) {
+			lastVideoTime = videoElement.currentTime;
+			if (gestureRecognizer) {
+				results = gestureRecognizer.recognizeForVideo(videoElement, nowInMs);
+				//console.log(results);
+				canvasCtx.save();
+				canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+				const drawingUtils = new DrawingUtils(canvasCtx);
+				if (results.landmarks) {
+					for (const landmarks of results.landmarks) {
+						drawingUtils.drawConnectors(
+							landmarks,
+							GestureRecognizer.HAND_CONNECTIONS, {
+								color: "#00FF00",
+								lineWidth: 5
+							}
+						);
+						drawingUtils.drawLandmarks(landmarks, {
+							color: "#FF0000",
+							lineWidth: 2
+						});
+					}
+				}
+				canvasCtx.restore();
+				if (results.gestures.length > 0) {
+				    const categoryName = results.gestures[0][0].categoryName;
+				    const categoryScore = parseFloat(
+				      results.gestures[0][0].score * 100
+				    ).toFixed(2);
+				    const handedness = results.handednesses[0][0].displayName;
+				    console.log(categoryName,categoryScore,handedness);
+					if(categoryName==="Thumb_Up")
+					{
+						simulateKeyDown('a');
+					}
+					if(categoryName==="Thumb_Down")
+					{
+						simulateKeyDown('d');
+					}
+					if(categoryName==="Closed_Fist")
+					{
+						simulateKeyDown('j');
+					}
+				  } else {
+				    
+				  }
+			}
+		}
+		window.requestAnimationFrame(predictWebcam);
+	}
+
+	let videoElement = document.getElementById("camera");
+	navigator.mediaDevices
+		.getUserMedia({
+			video: {
+				deviceId: localStorage.getItem("cameraId"),
+				width: 1280,
+				height: 720,
+			}
+		})
+		.then(function(stream) {
+			videoElement.srcObject = stream;
+			videoElement.play();
+			videoElement.addEventListener("loadeddata", predictWebcam);
+		})
+		.catch(function(err0r) {
+			alert(err0r);
+		});
+
+}
+
+
+
 
 function init() {
 
@@ -970,7 +1093,7 @@ function init() {
 
 	// keyborad control camera position
 	document.addEventListener("keydown", (event) => {
-		//console.log(event);
+		console.log(event,event.key);
 		let step = 0.01;
 		//ArrowLeft ArrowRight
 		switch (event.key) {
