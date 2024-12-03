@@ -132,12 +132,12 @@ function useHandpose() {
 							landmarks,
 							GestureRecognizer.HAND_CONNECTIONS, {
 								color: "#00FF00",
-								lineWidth: 5
+								lineWidth: 1
 							}
 						);
 						drawingUtils.drawLandmarks(landmarks, {
 							color: "#FF0000",
-							lineWidth: 2
+							lineWidth: 1
 						});
 					}
 				}

@@ -7,7 +7,7 @@
 		<meta name="viewport"
 			content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 		<title>Space Warrior</title>
-		
+
 		<script src="lib/vue.js"></script>
 		<style>
 			body {
@@ -150,13 +150,14 @@
 					</div>
 					<hr />
 					<h4 style="color:red">Gesture Control</h4>
-					<span style="font-size: 13px;color:blue">Thump up:move left<br/>Thump down:move right<br/>close fist:shoot</span>
-					<hr/>
+					<span style="font-size: 13px;color:blue">Thump up:move left<br />Thump down:move right<br />close
+						fist:shoot</span>
+					<hr />
 					<button class="btn_blue" style="width: 100%;height: 50px;font-size: 20px;">Load Game</button>
 					<button id="btn_start_1" class="btn_yellow"
 						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 1 player
 						Game</button>
-					
+
 				</div>
 			</div>
 
@@ -254,9 +255,10 @@
 							<h3 v-if="doublePlayer" style="color:blue">
 								Player 2 :score:{{player2Score}}&nbsp;&nbsp;&nbsp;&nbsp;life:{{player2Life}}
 							</h3>
-							<button id="btn_set" class="btn_blue" style="width:200px;height:40px">Use hand control</button>
-							
-							
+							<button id="btn_set" class="btn_blue" style="width:200px;height:40px">Use hand
+								control</button>
+
+
 						</div>
 
 
@@ -264,32 +266,32 @@
 				</div>
 			</div>
 		</div>
-		<canvas id="output_canvas" style="width:200px;
-							height: 200px;
-		                    border: solid 1px #ccc;
-		                    border-radius: 10px;
-							position: fixed;
-							bottom: 20px;
-							right: 20px;
-		                    overflow: hidden;
-		                    transform: scale(-1, 1);
-							margin-top: 200px;">
-			
-		</canvas>
 		<video muted id="camera" style="
-							display: none;
-		                    width:200px;
-							height: 200px;
+							display: block;
+		                    width:320px;
+							height: 240px;
 		                    border: solid 1px #ccc;
-		                    border-radius: 10px;
+		                    border-radius: 5px;
 							position: fixed;
 							bottom: 20px;
 							right: 20px;
 		                    overflow: hidden;
 		                    transform: scale(-1, 1);
-							margin-top: 200px;
+							
 		                "></video>
-		
+		<canvas id="output_canvas" style="width:320px;
+							height: 240px;
+		                    border: solid 1px #ccc;
+		                    border-radius: 5px;
+							position: fixed;
+							bottom: 20px;
+							right: 20px;
+		                    overflow: hidden;
+		                    transform: scale(-1, 1);
+							">
+
+		</canvas>
+
 		<script type="module" src="js/game.js"></script>
 	</body>
 
