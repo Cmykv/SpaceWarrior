@@ -31,12 +31,25 @@ import {
 	FXAAShader
 } from 'three/addons/shaders/FXAAShader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import {
+	ConvexObjectBreaker
+} from 'three/addons/misc/ConvexObjectBreaker.js';
+import {
+	ConvexGeometry
+} from 'three/addons/geometries/ConvexGeometry.js';
 
+import {
+	GLTFLoader
+} from 'three/addons/loaders/GLTFLoader.js';
+
+import {
+	DRACOLoader
+} from 'three/addons/loaders/DRACOLoader.js';
 import {
 	GestureRecognizer,
 	FilesetResolver,
 	DrawingUtils
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+} from "taskVision";
 
 const theModel = {
 	"name": "Vanguard",
@@ -240,6 +253,7 @@ function init() {
 	let innerWidth = document.querySelector("#model").clientWidth;
 	let innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
+	let particleLight;
 	//scene.background = new THREE.Color(0xa0a0a0);
 	//scene.fog = new THREE.Fog(0xa0a0a0, 500, 1000);
 
@@ -375,17 +389,62 @@ function init() {
 		const ambient = new THREE.AmbientLight(0x4466ff, 1);
 		scene.add(ambient);
 
+		particleLight = new THREE.Mesh(
+			new THREE.SphereGeometry(10, 8, 8),
+			new THREE.MeshBasicMaterial({
+				color: 0xffffff
+			})
+		);
+		scene.add(particleLight);
+
+		particleLight.add(new THREE.PointLight(0xffffff, 90));
+
 	}
+
+	const textureLoader = new THREE.TextureLoader();
+
+
+	const diffuse = textureLoader.load('./lib/Carbon.png');
+	diffuse.colorSpace = THREE.SRGBColorSpace;
+	diffuse.wrapS = THREE.RepeatWrapping;
+	diffuse.wrapT = THREE.RepeatWrapping;
+	diffuse.repeat.x = 1;
+	diffuse.repeat.y = 1;
+
+	const normalMap = textureLoader.load('./lib/Carbon_Normal.png');
+	normalMap.wrapS = THREE.RepeatWrapping;
+	normalMap.wrapT = THREE.RepeatWrapping;
+	normalMap.repeat.x = 1;
+	normalMap.repeat.y = 1;
+	const normalMap2 = textureLoader.load('./lib/Water_1_M_Normal.jpg');
+	const normalMap4 = textureLoader.load('./lib/golfball.jpg');
+	const clearcoatNormalMap = textureLoader.load('./lib/Scratched_gold_01_1K_Normal.png');
+
+	const material = new THREE.MeshPhysicalMaterial({
+		clearcoat: 1.0,
+		metalness: 1.0,
+		color: 0xff0000,
+		normalMap: normalMap2,
+		normalScale: new THREE.Vector2(0.15, 0.15),
+		clearcoatNormalMap: clearcoatNormalMap,
+
+		// y scale is negated to compensate for normal map handedness.
+		clearcoatNormalScale: new THREE.Vector2(2.0, -2.0)
+	});
+	const earthMaterial = new THREE.MeshPhongMaterial({
+		specular: 0x333333,
+		shininess: 5,
+		map: textureLoader.load('./lib/earth_atmos_2048.jpg'),
+		specularMap: textureLoader.load('./lib/earth_specular_2048.jpg'),
+		normalMap: textureLoader.load('./lib/earth_normal_2048.jpg'),
+		normalScale: new THREE.Vector2(0.85, 0.85)
+	});
+	earthMaterial.map.colorSpace = THREE.SRGBColorSpace;
 
 	function createWall() {
 		for (let i = 0; i < 2; i++) {
-			let cubeGeometry = new THREE.BoxGeometry(100, 200, 100);
-			let cubeMaterial = new THREE.MeshLambertMaterial({
-				color: 0x0000ff
-			});
-
-			let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-			//THREE.MathUtils.randFloatSpread(1000)
+			let cubeGeometry = new THREE.SphereGeometry(100, 200, 100);
+			let cube = new THREE.Mesh(cubeGeometry, i > 0 ? earthMaterial : material);
 			cube.position.x = 500 * (i > 0 ? 1 : -1);
 			cube.position.y = 100;
 			cube.position.z = 300;
@@ -420,30 +479,26 @@ function init() {
 		bullet.alive = true;
 		bullet.id = id;
 		bulletArr.push(bullet)
-		if (outlinePass) {
-			selectedObjects = [];
-			selectedObjects.push(bullet.obj);
-			outlinePass.selectedObjects = selectedObjects;
-		}
+
 
 	}
 
-	function createMonster2() {
+
+
+
+	function createMonsterRock() {
 		let r = monsterRadius;
 		let x = THREE.MathUtils.randFloatSpread(1000) - 500;
 		let y = 120;
 		let z = 1088;
 		const geometry = new THREE.SphereGeometry(r, 10, 10);
 		const material = new THREE.MeshPhongMaterial({
-			color: "#aa0000"
+			color: "#0000ff"
 		});
 		const group = new THREE.Group();
 		for (let i = -3; i <= 3; i++)
 			for (let j = -3; j <= 3; j++)
 				for (let m = -3; m <= 3; m++) {
-					if (Math.sqrt(i * i + j * j + m * m) > 3.5)
-						continue;
-
 					let ball = new THREE.Mesh(geometry, material)
 					ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
 					group.add(ball);
@@ -454,12 +509,70 @@ function init() {
 		group.alive = true;
 		group.speed = 5;
 		group.angle = 0;
-		group.distance = 0;
+		group.life = 100;
 		group.position.set(x, y, z);
 		scene.add(group);
 		monsterArr.push(group);
-		setTimeout(createMonster2, monsterDuration);
 	}
+	const stoneMass = 120;
+	let enemy_model;
+
+	function momsterBegin() {
+		createMonster();
+	}
+	
+	function monsterAct(monster){
+		
+		
+	}
+
+
+	function createMonster() {
+		for (let i = 0; i < 5; i++) {
+			let x = -500+i*250;;
+			let y = 10;
+			let z = 2000;
+			const group = new THREE.Group();
+			const g1 = new THREE.CylinderGeometry(50, 60, 100, 20);
+			const m1 = new THREE.MeshPhongMaterial({
+				color: "#0000ff"
+			});
+			const g2 = new THREE.SphereGeometry(40, 40, 20);
+			const m2 = new THREE.MeshPhongMaterial({
+				color: "#ffff7f"
+			});
+
+			const g3 = new THREE.CylinderGeometry(10, 10, 80, 20);
+			const m3 = new THREE.MeshPhongMaterial({
+				color: "#aa5500"
+			});
+
+			const body = new THREE.Mesh(g1, m1);
+			const head = new THREE.Mesh(g2, m2);
+			const gun = new THREE.Mesh(g3, m3);
+			gun.position.set(0, 100, -40);
+			gun.rotation.x = Math.PI / 2;
+
+			head.position.set(0, 90, 0);
+
+			group.add(body);
+			group.add(head);
+			group.add(gun);
+			group.position.set(x, y, z);
+			group.bom = false;
+			group.bomTimer = 0;
+			group.bomSpeed = 15;
+			group.alive = true;
+			group.speed = 5;
+			group.angle = 0;
+			group.distance = 0;
+			group.position.set(x, y, z);
+			scene.add(group);
+			monsterArr.push(group);
+		}
+	}
+
+
 
 	function bomMonster(monster) {
 		monster.traverse(function(obj) {
@@ -577,7 +690,7 @@ function init() {
 		player1.currentActionName = "idle";
 		player2.currentAction = player2.actions["idle"];
 		player2.currentActionName = "idle";
-		createMonster2();
+		momsterBegin();
 		animate();
 
 	}
@@ -722,29 +835,6 @@ function init() {
 	);
 	camera.position.set(0, 200, -1000);
 	camera.lookAt(0, 0, 0);
-
-	composer = new EffectComposer(renderer);
-
-	const renderPass = new RenderPass(scene, camera);
-	composer.addPass(renderPass);
-
-	outlinePass = new OutlinePass(new THREE.Vector2(document.querySelector("#model").clientWidth, document
-		.querySelector("#model").clientHeight), scene, camera);
-	outlinePass.edgeStrength = 8;
-	outlinePass.edgeGlow = 1;
-	outlinePass.visibleEdgeColor.set("#ff0000");
-	outlinePass.edgeThickness = 4;
-	outlinePass.pulsePeriod = 2;
-	composer.addPass(outlinePass);
-
-	const outputPass = new OutputPass();
-	composer.addPass(outputPass);
-
-	effectFXAA = new ShaderPass(FXAAShader);
-	effectFXAA.uniforms['resolution'].value.set(1 / document.querySelector("#model").clientWidth, 1 / document
-		.querySelector("#model").clientHeight);
-	composer.addPass(effectFXAA);
-	outlinePass.selectedObjects = [];
 
 
 	window.addEventListener(
@@ -938,7 +1028,10 @@ function init() {
 	}
 
 	function animate() {
+		wallArr.forEach(item => {
+			item.rotation.y += 0.01;
 
+		});
 		let bulletList = [];
 		bulletArr.forEach(item => {
 			if (item.alive && item.distance < 2000)
@@ -960,15 +1053,10 @@ function init() {
 		let monsterList = [];
 		monsterArr.forEach(item => {
 			if (item.alive) {
-				if (item.distance < 1500) {
-					monsterList.push(item);
-				} else {
-					scene.remove(item);
-					item = null;
-				}
+				monsterList.push(item);
 			}
 			if (item && item.bom) {
-				if (item.bomTimer < 30) {
+				if (item.bomTimer < 20) {
 					monsterList.push(item);
 				} else {
 					scene.remove(item);
@@ -980,12 +1068,12 @@ function init() {
 
 		monsterArr.forEach(item => {
 			if (item.alive) {
-				let dx = item.speed * Math.sin(item.angle);
-				let dz = item.speed * Math.cos(item.angle);
-				item.translateZ(-dz);
-				item.translateX(dx);
+				//let dx = item.speed * Math.sin(item.angle);
+				//let dz = item.speed * Math.cos(item.angle);
+				//item.translateZ(-dz);
+				//item.translateX(dx);
 
-				item.distance += item.speed;
+				//item.distance += item.speed;
 			}
 			if (item.bom) {
 				item.traverse(function(child) {
@@ -1071,13 +1159,17 @@ function init() {
 		uniforms.iTime.value += 0.05;
 		stats.update();
 
+		const timer = Date.now() * 0.000025;
+
+		particleLight.position.x = Math.sin(timer * 7) * 500;
+		particleLight.position.y = 300;
+		particleLight.position.z = Math.cos(timer * 3) * 500;
+
 		let needCompose = false;
 		if (bulletArr.length > 0)
 			needCompose = true;
-		if (false)
-			composer.render();
-		else
-			renderer.render(scene, camera);
+
+		renderer.render(scene, camera);
 		requestAnimationFrame(animate);
 	}
 
