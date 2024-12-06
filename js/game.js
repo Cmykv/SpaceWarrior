@@ -115,9 +115,7 @@ function useHandpose() {
 		);
 		gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
 			baseOptions: {
-				modelAssetPath:
-					//"https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
-					"./app/shared/models/gesture_recognizer.task",
+				modelAssetPath: "./app/shared/models/gesture_recognizer.task",
 				delegate: "GPU"
 			},
 			runningMode: runningMode
@@ -478,9 +476,33 @@ function init() {
 		bullet.distance = 0;
 		bullet.alive = true;
 		bullet.id = id;
-		bulletArr.push(bullet)
+		bullet.human = true;
+		bulletArr.push(bullet);
+	}
 
-
+	function createMonsterBullet(monster) {
+		const geometry = new THREE.SphereGeometry(9, 50, 50);
+		//const material = new THREE.MeshBasicMaterial({ map: map });
+		const material = new THREE.MeshPhongMaterial({
+			color: 0x00ff00, // 设置材质颜色
+			specular: 0x00ff11,
+			shininess: 50
+		});
+		let sphere = new THREE.Mesh(geometry, material);;
+		let d=50;
+		sphere.position.x = monster.position.x + d*Math.sin(monster.rotation.y);
+		sphere.position.y = 120;
+		sphere.position.z = monster.position.z - d*Math.cos(monster.rotation.y);
+		scene.add(sphere);
+		let bullet = {};
+		bullet.obj = sphere;
+		bullet.speed = 10;
+		bullet.angle = monster.rotation.y;;
+		bullet.distance = 0;
+		bullet.alive = true;
+		bullet.id = 3;
+		bullet.human = false;
+		bulletArr.push(bullet);
 	}
 
 
@@ -510,6 +532,14 @@ function init() {
 		group.speed = 5;
 		group.angle = 0;
 		group.life = 100;
+		group.action = "move";
+		group.moveDuration = 900;
+		group.rotDuration = 500;
+		group.fireDuration = 600;
+		group.direction = [0, 0];
+		group.actionClock = 0;
+		group.targetRot = 0;
+		group.fired = false;
 		group.position.set(x, y, z);
 		scene.add(group);
 		monsterArr.push(group);
@@ -520,16 +550,54 @@ function init() {
 	function momsterBegin() {
 		createMonster();
 	}
-	
-	function monsterAct(monster){
-		
-		
+	/*
+	 */
+	function monsterAct(monster) {
+		//console.log(monster);
+		let t = Date.now();
+		let randomNumber = Math.floor(Math.random() * 2);
+		let directionRandom = Math.floor(Math.random() * 4);
+		if (monster.action === "move") {
+			if (t - monster.actionClock > monster.moveDuration) {
+				monster.action = randomNumber > 0 ? "rot" : "move";
+				if (monster.action == "move") {
+					switch (directionRandom) {
+						case 0:
+							monster.direction = [0, 1];
+						case 1:
+							monster.direction = [0, -1];
+						case 2:
+							monster.direction = [1, 0];
+						case 3:
+							monster.direction = [1, -1];
+					}
+				} else {
+					let dx = monster.position.x - player1.model.position.x;
+					let dz = monster.position.z - player1.model.position.z;
+				}
+				monster.actionClock = t;
+			}
+		}
+		if (monster.action === "rot") {
+			if (t - monster.actionClock > monster.rotDuration) {
+
+				monster.action = "fire";
+				monster.fired = false;
+				monster.actionClock = t;
+			}
+		}
+		if (monster.action === "fire") {
+			if (t - monster.actionClock > monster.fireDuration) {
+				monster.action = "move";
+				monster.actionClock = t;
+			}
+		}
 	}
 
 
 	function createMonster() {
-		for (let i = 0; i < 5; i++) {
-			let x = -500+i*250;;
+		for (let i = 0; i < 3; i++) {
+			let x = -500 + i * 250;;
 			let y = 10;
 			let z = 2000;
 			const group = new THREE.Group();
@@ -561,12 +629,19 @@ function init() {
 			group.position.set(x, y, z);
 			group.bom = false;
 			group.bomTimer = 0;
-			group.bomSpeed = 15;
+			group.bomSpeed = 5;
 			group.alive = true;
 			group.speed = 5;
 			group.angle = 0;
-			group.distance = 0;
-			group.position.set(x, y, z);
+			group.life = 100;
+			group.action = "move";
+			group.moveDuration = 900;
+			group.rotDuration = 500;
+			group.fireDuration = 600;
+			group.direction = [0, 0];
+			group.actionClock = 0;
+			group.targetRot = 0;
+			group.fired = false;
 			scene.add(group);
 			monsterArr.push(group);
 		}
@@ -1034,7 +1109,7 @@ function init() {
 		});
 		let bulletList = [];
 		bulletArr.forEach(item => {
-			if (item.alive && item.distance < 2000)
+			if (item.alive && item.distance < 4000)
 				bulletList.push(item);
 			else
 				scene.remove(item.obj)
@@ -1044,8 +1119,13 @@ function init() {
 			if (item.alive) {
 				let dx = item.speed * Math.sin(item.angle);
 				let dz = item.speed * Math.cos(item.angle);
-				item.obj.position.x += dx;
-				item.obj.position.z += dz;
+				if (item.human) {
+					item.obj.position.x += dx;
+					item.obj.position.z += dz;
+				} else {
+					item.obj.position.x -= dx;
+					item.obj.position.z -= dz;
+				}
 				item.distance += item.speed;
 			}
 		});
@@ -1067,13 +1147,28 @@ function init() {
 		monsterArr = monsterList;
 
 		monsterArr.forEach(item => {
-			if (item.alive) {
-				//let dx = item.speed * Math.sin(item.angle);
-				//let dz = item.speed * Math.cos(item.angle);
-				//item.translateZ(-dz);
-				//item.translateX(dx);
 
-				//item.distance += item.speed;
+			if (item.alive) {
+				monsterAct(item);
+				if (item.action === "move") {
+					item.translateX(item.direction[0] * 0.5);
+					item.translateZ(item.direction[1] * 0.5);
+				}
+				if (item.action === "fire") {
+					if (item.fired == false) {
+						createMonsterBullet(item);
+						item.fired = true;
+					}
+				}
+				if (item.action === "rot") {
+					//item.lookAt(player1.model.position);
+					let dx = item.position.x - player1.model.position.x;
+					let dz = item.position.z - player1.model.position.z;
+					let da = Math.asin(dx / dz);
+					if (item.rotation.y < da) {
+						item.rotation.y += 0.01;
+					}
+				}
 			}
 			if (item.bom) {
 				item.traverse(function(child) {
@@ -1126,7 +1221,8 @@ function init() {
 						bomMonster(item);
 					}
 				})
-				bulletArr.forEach(bullet => {
+				bulletArr.filter(x => x.human).forEach(bullet => {
+
 					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
 						bullet.alive = false;
@@ -1142,7 +1238,7 @@ function init() {
 			}
 
 		});
-		bulletArr.forEach(bullet => {
+		bulletArr.filter(x => x.human).forEach(bullet => {
 			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 			wallArr.forEach(wall => {
 				let wallMeshBox = new THREE.Box3().setFromObject(wall);
