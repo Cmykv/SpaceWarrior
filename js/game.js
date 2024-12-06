@@ -74,9 +74,10 @@ let app = new Vue({
 		failed: false,
 		failedText: "Load failed",
 		player1Score: 0,
-		player1Life: 100,
+		player1Life: 0,
 		player2Score: 0,
-		player2Life: 100,
+		player2Life: 0,
+		level:1
 	},
 });
 
@@ -212,8 +213,10 @@ function init() {
 		skeletonHelper: null,
 		actions: [],
 		animationMixer: null,
+		damage: 20,
 		score: 0,
-		life: 100,
+		alive: true,
+		life: 10,
 		foot: null
 	};
 	let player2 = {
@@ -226,10 +229,13 @@ function init() {
 		skeletonHelper: null,
 		actions: [],
 		animationMixer: null,
+		damage: 20,
 		score: 0,
-		life: 100,
+		alive: true,
+		life: 10,
 		foot: null
 	};
+
 	const uniforms = {
 		iTime: {
 			value: 0
@@ -239,7 +245,7 @@ function init() {
 		}
 	};
 
-
+	let gameLevel = 1;
 	let clock = new THREE.Clock();
 	// gltf and vrm
 	let loader = new FBXLoader();;
@@ -252,6 +258,7 @@ function init() {
 	let innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
 	let particleLight;
+	let monsterCreated= true;
 	//scene.background = new THREE.Color(0xa0a0a0);
 	//scene.fog = new THREE.Fog(0xa0a0a0, 500, 1000);
 
@@ -339,9 +346,9 @@ function init() {
 			fragmentShader: fragmentShader,
 		});
 
-		const geometry = new THREE.PlaneGeometry(5000, 5000);
+		const geometry = new THREE.PlaneGeometry(10000, 10000);
 		const mesh = new THREE.Mesh(geometry, shaderMaterial);
-		mesh.position.set(0, 0, 2000);
+		mesh.position.set(0, 0, 3500);
 		mesh.rotation.y = -Math.PI;
 		scene.add(mesh);
 	}
@@ -471,7 +478,7 @@ function init() {
 		scene.add(sphere);
 		let bullet = {};
 		bullet.obj = sphere;
-		bullet.speed = 35;
+		bullet.speed = 100;
 		bullet.angle = 0;
 		bullet.distance = 0;
 		bullet.alive = true;
@@ -489,10 +496,10 @@ function init() {
 			shininess: 50
 		});
 		let sphere = new THREE.Mesh(geometry, material);;
-		let d=50;
-		sphere.position.x = monster.position.x + d*Math.sin(monster.rotation.y);
+		let d = 50;
+		sphere.position.x = monster.position.x - d * Math.sin(monster.rotation.y);
 		sphere.position.y = 120;
-		sphere.position.z = monster.position.z - d*Math.cos(monster.rotation.y);
+		sphere.position.z = monster.position.z - d * Math.cos(monster.rotation.y);
 		scene.add(sphere);
 		let bullet = {};
 		bullet.obj = sphere;
@@ -569,11 +576,10 @@ function init() {
 						case 2:
 							monster.direction = [1, 0];
 						case 3:
-							monster.direction = [1, -1];
+							monster.direction = [-1, 0];
 					}
 				} else {
-					let dx = monster.position.x - player1.model.position.x;
-					let dz = monster.position.z - player1.model.position.z;
+
 				}
 				monster.actionClock = t;
 			}
@@ -596,10 +602,11 @@ function init() {
 
 
 	function createMonster() {
-		for (let i = 0; i < 3; i++) {
-			let x = -500 + i * 250;;
+		let num = gameLevel + 0;
+		for (let i = 0; i < num; i++) {
+			let x = -200 + i * 250;;
 			let y = 10;
-			let z = 2000;
+			let z = 2500;
 			const group = new THREE.Group();
 			const g1 = new THREE.CylinderGeometry(50, 60, 100, 20);
 			const m1 = new THREE.MeshPhongMaterial({
@@ -633,7 +640,7 @@ function init() {
 			group.alive = true;
 			group.speed = 5;
 			group.angle = 0;
-			group.life = 100;
+			group.life = 20;
 			group.action = "move";
 			group.moveDuration = 900;
 			group.rotDuration = 500;
@@ -645,6 +652,12 @@ function init() {
 			scene.add(group);
 			monsterArr.push(group);
 		}
+		monsterCreated=true;
+	}
+
+	function levelUp() {
+		gameLevel += 1;
+		createMonster();
 	}
 
 
@@ -826,6 +839,9 @@ function init() {
 	}
 
 	function switchAction(player, newActionName, fadeDuration = 0.1) {
+		if (newActionName !== 'death' && newActionName !== 'idle' && !player.alive) {
+			return;
+		}
 		console.log("switch to action " + newActionName, player.id)
 		const newAction = player.actions[newActionName];
 		if (newAction && player.currentAction !== newAction) {
@@ -1164,9 +1180,11 @@ function init() {
 					//item.lookAt(player1.model.position);
 					let dx = item.position.x - player1.model.position.x;
 					let dz = item.position.z - player1.model.position.z;
-					let da = Math.asin(dx / dz);
+					let da = Math.atan(dx / dz);
 					if (item.rotation.y < da) {
 						item.rotation.y += 0.01;
+					} else {
+						item.rotation.y -= 0.01;
 					}
 				}
 			}
@@ -1208,17 +1226,19 @@ function init() {
 			if (item.alive) {
 				let boxMeshBox = new THREE.Box3().setFromObject(item);
 				if (playerBox.intersectsBox(boxMeshBox)) {
-					player1.life -= 2;
-					bomMonster(item);
+					player1.life -= 100;
+					item.life -= 100;
+
 				}
 				if (playerBox2 && playerBox2.intersectsBox(boxMeshBox)) {
-					player2.life -= 2;
-					bomMonster(item);
+					player2.life -= 100;
+					item.life -= 100;
+
 				}
 				wallArr.forEach(wall => {
 					let wallMeshBox = new THREE.Box3().setFromObject(wall);
 					if (wallMeshBox.intersectsBox(boxMeshBox)) {
-						bomMonster(item);
+						item.life -= 100;
 					}
 				})
 				bulletArr.filter(x => x.human).forEach(bullet => {
@@ -1226,19 +1246,19 @@ function init() {
 					let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 					if (bulletMeshBox.intersectsBox(boxMeshBox)) {
 						bullet.alive = false;
-						console.log("player ", bullet.id, " score");
 						if (bullet.id == 1) {
 							player1.score += 1;
+							item.life -= player1.damage;
 						} else {
 							player2.score += 1;
+							item.life -= player2.damage;
 						}
-						bomMonster(item);
 					}
 				})
 			}
 
 		});
-		bulletArr.filter(x => x.human).forEach(bullet => {
+		bulletArr.forEach(bullet => {
 			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 			wallArr.forEach(wall => {
 				let wallMeshBox = new THREE.Box3().setFromObject(wall);
@@ -1246,12 +1266,39 @@ function init() {
 					bullet.alive = false;
 				}
 			})
-		})
+		});
 
-		app.player1Life = player1.life;
+		bulletArr.filter(x => x.human == false).forEach(bullet => {
+			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
+			if (playerBox.intersectsBox(bulletMeshBox)) {
+				player1.life -= 2;
+				bullet.alive = false;
+			}
+			if (playerBox2 && playerBox2.intersectsBox(bulletMeshBox)) {
+				player2.life -= 2;
+				bullet.alive = false;
+			}
+		});
+
+		monsterArr.forEach(item => {
+			if (item.life <= 0) {
+				item.alive = false;
+				bomMonster(item);
+			}
+		})
+		if (player1.life <= 0) {
+			switchAction(player1, "death");
+			player1.alive = false;
+		}
+		if (player2.life <= 0) {
+			switchAction(player2, "death");
+			player2.alive = false;
+		}
+		app.player1Life = player1.life < 0 ? 0 : player1.life;
 		app.player1Score = player1.score;
-		app.player2Life = player2.life;
+		app.player2Life = player2.life < 0 ? 0 : player2.life;
 		app.player2Score = player2.score;
+		app.level = gameLevel;
 		uniforms.iTime.value += 0.05;
 		stats.update();
 
@@ -1260,6 +1307,12 @@ function init() {
 		particleLight.position.x = Math.sin(timer * 7) * 500;
 		particleLight.position.y = 300;
 		particleLight.position.z = Math.cos(timer * 3) * 500;
+		
+		if(monsterCreated && monsterArr.length==0)
+		{
+			monsterCreated=false;
+			levelUp();
+		}
 
 		let needCompose = false;
 		if (bulletArr.length > 0)
