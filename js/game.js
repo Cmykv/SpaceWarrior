@@ -346,10 +346,12 @@ function init() {
 			fragmentShader: fragmentShader,
 		});
 
-		const geometry = new THREE.PlaneGeometry(10000, 10000);
+		//const geometry = new THREE.PlaneGeometry(10000, 10000);
+		const geometry = new THREE.SphereGeometry(3500, 100,100);
+		geometry.scale(-1,1,1);
 		const mesh = new THREE.Mesh(geometry, shaderMaterial);
-		mesh.position.set(0, 0, 3500);
-		mesh.rotation.y = -Math.PI;
+		mesh.position.set(0, 0, 0);
+		//mesh.rotation.y = -Math.PI;
 		scene.add(mesh);
 	}
 
@@ -449,10 +451,10 @@ function init() {
 	function createWall() {
 		for (let i = 0; i < 2; i++) {
 			let cubeGeometry = new THREE.SphereGeometry(100, 200, 100);
-			let cube = new THREE.Mesh(cubeGeometry, i > 0 ? earthMaterial : material);
-			cube.position.x = 500 * (i > 0 ? 1 : -1);
+			let cube = new THREE.Mesh(cubeGeometry, i == 0 ? earthMaterial : material);
+			cube.position.x = 500;
 			cube.position.y = 100;
-			cube.position.z = 300;
+			cube.position.z = 2000*i;
 			//cube.layers.set(1);
 			//告诉立方体需要投射阴影
 			cube.castShadow = true;
