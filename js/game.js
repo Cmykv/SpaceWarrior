@@ -45,6 +45,9 @@ import {
 import {
 	DRACOLoader
 } from 'three/addons/loaders/DRACOLoader.js';
+
+
+
 import {
 	GestureRecognizer,
 	FilesetResolver,
@@ -265,77 +268,41 @@ function init() {
 
 	let composer, effectFXAA, outlinePass;
 	let selectedObjects = [];
+	let audioObject = [];
 
 
 
 
 	const vertexShader = `
-   void main() {
-       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-   }
-   `;
+	   void main() {
+		   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+	   }
+	   `;
 
-	const fragmentShader = `
-   uniform float iTime;
-   uniform vec2 iResolution;
-   int iterations=17;
-   float formuparam=0.53;
+	const fragmentShader = document.getElementById("fragmentShader").textContent;
    
-   int volsteps= 20;
-   float stepsize= 0.1;
-   
-   float zoom=   0.800;
-   float tile=   0.850;
-   float speed=  0.0010 ;
-   
-   float brightness= 0.0015;
-   float darkmatter= 0.300;
-   float distfading= 0.730;
-   float saturation= 0.850;
-   
-   void main() {
-   		vec2 uv=gl_FragCoord.xy/iResolution.xy-.5;
-   		uv.y*=iResolution.y/iResolution.x;
-   		vec3 dir=vec3(uv*zoom,1.);
-   		float time=iTime*speed+.25;
-   	
-   
-   		float a1=.5+100.0/iResolution.x*2.;
-   		float a2=.8+100.0/iResolution.y*2.;
-   		mat2 rot1=mat2(cos(a1),sin(a1),-sin(a1),cos(a1));
-   		mat2 rot2=mat2(cos(a2),sin(a2),-sin(a2),cos(a2));
-   		dir.xz*=rot1;
-   		dir.xy*=rot2;
-   		vec3 from=vec3(1.,.5,0.5);
-   		from+=vec3(time*2.,time,-2.);
-   		from.xz*=rot1;
-   		from.xy*=rot2;
-   		
-   		//volumetric rendering
-   		float s=0.1,fade=1.;
-   		vec3 v=vec3(0.);
-   		for (int r=0; r<volsteps; r++) {
-   			vec3 p=from+s*dir*.5;
-   			p = abs(vec3(tile)-mod(p,vec3(tile*2.)));
-   			float pa,a=pa=0.;
-   			for (int i=0; i<iterations; i++) { 
-   				p=abs(p)/dot(p,p)-formuparam; 
-   				a+=abs(length(p)-pa); 
-   				pa=length(p);
-   			}
-   			float dm=max(0.,darkmatter-a*a*.001);
-   			a*=a*a; 
-   			if (r>6) fade*=1.-dm;
-   			v+=fade;
-   			v+=vec3(s,s*s,s*s*s*s)*a*brightness*fade; 
-   			fade*=distfading;
-   			s+=stepsize;
-   		}
-   		v=mix(vec3(length(v)),v,saturation);
-   		gl_FragColor = vec4(v*.01,1.);
+   function loadMp3()
+   {
+	   let listener = new THREE.AudioListener();
+	   let audioLoader = new THREE.AudioLoader();
+	   audioLoader.load('./lib/shoot.mp3', function(AudioBuffer) {
+		 let audio = new THREE.Audio(listener);
+	     audio.setBuffer(AudioBuffer);
+	     audio.setLoop(false);
+	     audio.setVolume(0.5);
+		 audioObject["shoot"] =audio;
+	     //audio.play();
+	   });
+	   
+	   audioLoader.load('./lib/boom.mp3', function(AudioBuffer) {
+	   	let audio = new THREE.Audio(listener);
+	     audio.setBuffer(AudioBuffer);
+	     audio.setLoop(false);
+	     audio.setVolume(0.5);
+	   	 audioObject["boom"] =audio;
+	     //audio.play();
+	   });
    }
-   `;
-
 
 	function setBackground() {
 
@@ -487,6 +454,8 @@ function init() {
 		bullet.id = id;
 		bullet.human = true;
 		bulletArr.push(bullet);
+		
+		audioObject["shoot"].play();
 	}
 
 	function createMonsterBullet(monster) {
@@ -673,6 +642,7 @@ function init() {
 		})
 		monster.bom = true;
 		monster.alive = false;
+		audioObject["boom"].play();
 	}
 
 
@@ -955,6 +925,7 @@ function init() {
 	setControll();
 	createWall();
 	loadAvatar(player1, new THREE.Vector3(-100, 0, 0));
+	loadMp3();
 
 	let colors = ["red", "blue", "green"];
 	const params = {
