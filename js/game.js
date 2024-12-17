@@ -11,32 +11,7 @@ import {
 import {
 	GUI
 } from 'three/addons/libs/lil-gui.module.min.js';
-
-import {
-	EffectComposer
-} from 'three/addons/postprocessing/EffectComposer.js';
-import {
-	RenderPass
-} from 'three/addons/postprocessing/RenderPass.js';
-import {
-	ShaderPass
-} from 'three/addons/postprocessing/ShaderPass.js';
-import {
-	OutlinePass
-} from 'three/addons/postprocessing/OutlinePass.js';
-import {
-	OutputPass
-} from 'three/addons/postprocessing/OutputPass.js';
-import {
-	FXAAShader
-} from 'three/addons/shaders/FXAAShader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import {
-	ConvexObjectBreaker
-} from 'three/addons/misc/ConvexObjectBreaker.js';
-import {
-	ConvexGeometry
-} from 'three/addons/geometries/ConvexGeometry.js';
 
 import {
 	GLTFLoader
@@ -46,13 +21,17 @@ import {
 	DRACOLoader
 } from 'three/addons/loaders/DRACOLoader.js';
 
-
+import {
+	Water
+} from 'three/addons/objects/Water2.js';
 
 import {
 	GestureRecognizer,
 	FilesetResolver,
 	DrawingUtils
 } from "taskVision";
+
+
 
 const theModel = {
 	"name": "Vanguard",
@@ -80,7 +59,7 @@ let app = new Vue({
 		player1Life: 0,
 		player2Score: 0,
 		player2Life: 0,
-		level:1
+		level: 1
 	},
 });
 
@@ -261,15 +240,14 @@ function init() {
 	let innerHeight = document.querySelector("#model").clientHeight;
 	const scene = new THREE.Scene();
 	let particleLight;
-	let monsterCreated= true;
-	//scene.background = new THREE.Color(0xa0a0a0);
-	//scene.fog = new THREE.Fog(0xa0a0a0, 500, 1000);
+	let monsterCreated = true;
+	let water = null;
 
 
 	let composer, effectFXAA, outlinePass;
 	let selectedObjects = [];
 	let audioObject = [];
-
+	let smokeParticles = [];
 
 
 
@@ -280,29 +258,62 @@ function init() {
 	   `;
 
 	const fragmentShader = document.getElementById("fragmentShader").textContent;
-   
-   function loadMp3()
-   {
-	   let listener = new THREE.AudioListener();
-	   let audioLoader = new THREE.AudioLoader();
-	   audioLoader.load('./lib/shoot.mp3', function(AudioBuffer) {
-		 let audio = new THREE.Audio(listener);
-	     audio.setBuffer(AudioBuffer);
-	     audio.setLoop(false);
-	     audio.setVolume(0.5);
-		 audioObject["shoot"] =audio;
-	     //audio.play();
-	   });
-	   
-	   audioLoader.load('./lib/boom.mp3', function(AudioBuffer) {
-	   	let audio = new THREE.Audio(listener);
-	     audio.setBuffer(AudioBuffer);
-	     audio.setLoop(false);
-	     audio.setVolume(0.5);
-	   	 audioObject["boom"] =audio;
-	     //audio.play();
-	   });
-   }
+	
+	const textureLoader = new THREE.TextureLoader();
+	
+	const smokeMap = textureLoader.load('./lib/smoke.png');
+
+	function setScene() {
+		 let smokeMaterial = new THREE.MeshLambertMaterial({
+		    color: new THREE.Color("rgb(83, 84, 255)"),
+		    map: smokeMap,
+		    transparent: true
+		  });
+		  let smokeGeo = new THREE.PlaneGeometry(100, 100);
+
+		  for (let p = 0; p < 150; p++) {
+		    let particle = new THREE.Mesh(smokeGeo, smokeMaterial);
+		    particle.position.set(
+		      Math.random() * 500 - 250,
+		      10,
+		      Math.random() * 1000 - 100
+		    );
+		    particle.rotation.y = -Math.PI;
+		    scene.add(particle);
+		    smokeParticles.push(particle);
+		  }
+		
+	}
+	
+	function evolveSmoke(delta) {
+	  let sp = smokeParticles.length;
+	  while (sp--) {
+	    smokeParticles[sp].rotation.z += delta * 0.2;
+	  }
+	}
+
+
+	function loadMp3() {
+		let listener = new THREE.AudioListener();
+		let audioLoader = new THREE.AudioLoader();
+		audioLoader.load('./lib/shoot.mp3', function(AudioBuffer) {
+			let audio = new THREE.Audio(listener);
+			audio.setBuffer(AudioBuffer);
+			audio.setLoop(false);
+			audio.setVolume(0.5);
+			audioObject["shoot"] = audio;
+			//audio.play();
+		});
+
+		audioLoader.load('./lib/boom.mp3', function(AudioBuffer) {
+			let audio = new THREE.Audio(listener);
+			audio.setBuffer(AudioBuffer);
+			audio.setLoop(false);
+			audio.setVolume(0.5);
+			audioObject["boom"] = audio;
+			//audio.play();
+		});
+	}
 
 	function setBackground() {
 
@@ -314,8 +325,8 @@ function init() {
 		});
 
 		//const geometry = new THREE.PlaneGeometry(10000, 10000);
-		const geometry = new THREE.SphereGeometry(3500, 100,100);
-		geometry.scale(-1,1,1);
+		const geometry = new THREE.SphereGeometry(3500, 100, 100);
+		geometry.scale(-1, 1, 1);
 		const mesh = new THREE.Mesh(geometry, shaderMaterial);
 		mesh.position.set(0, 0, 0);
 		//mesh.rotation.y = -Math.PI;
@@ -375,7 +386,7 @@ function init() {
 
 	}
 
-	const textureLoader = new THREE.TextureLoader();
+	
 
 
 	const diffuse = textureLoader.load('./lib/Carbon.png');
@@ -421,7 +432,7 @@ function init() {
 			let cube = new THREE.Mesh(cubeGeometry, i == 0 ? earthMaterial : material);
 			cube.position.x = 500;
 			cube.position.y = 100;
-			cube.position.z = 2000*i;
+			cube.position.z = 2000 * i;
 			//cube.layers.set(1);
 			//告诉立方体需要投射阴影
 			cube.castShadow = true;
@@ -454,7 +465,7 @@ function init() {
 		bullet.id = id;
 		bullet.human = true;
 		bulletArr.push(bullet);
-		
+
 		audioObject["shoot"].play();
 	}
 
@@ -623,7 +634,7 @@ function init() {
 			scene.add(group);
 			monsterArr.push(group);
 		}
-		monsterCreated=true;
+		monsterCreated = true;
 	}
 
 	function levelUp() {
@@ -845,9 +856,16 @@ function init() {
 	}
 
 	function setFloor() {
+		const params = {
+			color: '#0055ff',
+			scale: 1,
+			flowX: 1,
+			flowY: 1
+		};
+		
 		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshPhongMaterial({
-			color: 0x999999,
-			depthWrite: false
+			color: '#83828b',
+			roughness: 0.8, metalness: 0.4
 		}));
 		mesh.rotation.x = -Math.PI / 2;
 		mesh.receiveShadow = true;
@@ -856,6 +874,7 @@ function init() {
 		grid.material.opacity = 0.2;
 		grid.material.transparent = true;
 		scene.add(grid);
+		
 	}
 
 
@@ -917,7 +936,7 @@ function init() {
 
 
 	// scene
-
+	setScene();
 	setBackground();
 	setFloor();
 	setLight();
@@ -1092,6 +1111,8 @@ function init() {
 	}
 
 	function animate() {
+		
+		
 		wallArr.forEach(item => {
 			item.rotation.y += 0.01;
 
@@ -1180,6 +1201,9 @@ function init() {
 		});
 
 		let delta = clock.getDelta();
+		
+		evolveSmoke(delta);
+		
 		if (player1.animationMixer != null) {
 			player1.animationMixer.update(delta);
 		}
@@ -1259,11 +1283,11 @@ function init() {
 				bomMonster(item);
 			}
 		})
-		if (player1.life <= 0) {
+		if (player1.alive && player1.life <= 0) {
 			switchAction(player1, "death");
 			player1.alive = false;
 		}
-		if (player2.life <= 0) {
+		if (player2.alive && player2.life <= 0) {
 			switchAction(player2, "death");
 			player2.alive = false;
 		}
@@ -1280,10 +1304,9 @@ function init() {
 		particleLight.position.x = Math.sin(timer * 7) * 500;
 		particleLight.position.y = 300;
 		particleLight.position.z = Math.cos(timer * 3) * 500;
-		
-		if(monsterCreated && monsterArr.length==0)
-		{
-			monsterCreated=false;
+
+		if (monsterCreated && monsterArr.length == 0) {
+			monsterCreated = false;
 			levelUp();
 		}
 
