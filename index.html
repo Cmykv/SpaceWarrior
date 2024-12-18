@@ -136,7 +136,68 @@
 						}
 					}
 				</script>
-				
+				<script type="x-shader/x-fragment" id="floorShader">
+					
+					uniform float iTime;
+					uniform vec2 iResolution;
+					void wave(inout float x, inout float y, inout float z, float T, int octaves, float a)
+					{
+						float R=8.;
+						float S=.03;
+						float W=-.05;
+						#define RRRRS R*=.72;S*=1.27;W*=1.21;
+						for(int s=0;s<octaves;s++)
+						{
+							float da=1.8+(sin(T*0.021)*0.1+.41*sin(float(s)*.71+T*0.02))*a;
+							float dx=cos(da);
+							float dy=sin(da);
+							float t=-dot(vec2(x-320.,y-240.),vec2(dx,dy));
+							float sa=sin(T*W+t*S)*R;
+							float ca=cos(T*W+t*S)*R;
+					
+							x-=ca*dx*2.;
+							y-=ca*dy*2.;
+							z-=sa;
+							RRRRS
+						}
+					}
+					
+					float chkr(vec2 p, float t)
+					{
+					    vec2 fxy=vec2(p.x,p.y);
+					  	fxy=abs(fract((fxy+0.5)/2.0)-0.5)-0.25;
+					    fxy=clamp(fxy*t+0.5,0.0,1.0);
+					    float f=mix(fxy.x,1.0-fxy.x,fxy.y);
+					    return f;
+					}
+					
+					float tex(vec2 p)
+					{
+					    //return chkr(p*.1,100.);
+					    float z=0.;
+					    p=vec2(p.x+p.y*.3,p.y-p.x*.3);
+					    p.x=p.x+17.;
+					    p.y=p.y-150.;
+					    wave(p.x, p.y, z, 12.21-iTime*.01,6,10.);
+					    p.x*=18.;
+					    p.y*=19.;
+					    return sin(p.y*0.04+.1*z)*z*.1;
+					}
+					
+					void main( )
+					{
+					    vec2 uv = gl_FragCoord.xy/iResolution.xy*vec2(640.,480.);
+					    vec2 uv0=uv;
+					    float z=0.;
+					    wave(uv.x, uv.y, z, iTime*2., 17,1.);
+					    z=z+22.;
+					    z*=0.018;
+					    vec3 col = vec3(.3+z*1.2,.2+z*.9,.1+z*.6);
+					    uv=uv0+0.5*(uv-uv0);
+					    //col.rgb*=.9+.1*vec3(.75+.25*tex(vec2(uv0.x,uv.y+iTime*10.)));
+					    gl_FragColor = vec4(col,1.0);
+					}
+					</script>
 				
 				<script type="x-shader/x-fragment" id="fragmentShader">						
 						uniform float iTime;

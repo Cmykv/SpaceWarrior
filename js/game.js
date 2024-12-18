@@ -282,6 +282,7 @@ function init(level) {
 	   `;
 
 	const fragmentShader = document.getElementById("fragmentShader").textContent;
+	const floorShader =  document.getElementById("floorShader").textContent;
 
 	const textureLoader = new THREE.TextureLoader();
 
@@ -298,9 +299,9 @@ function init(level) {
 		for (let p = 0; p < 150; p++) {
 			let particle = new THREE.Mesh(smokeGeo, smokeMaterial);
 			particle.position.set(
-				Math.random() * 500 - 250,
+				Math.random() * 2000 - 250,
 				10,
-				Math.random() * 1000 - 100
+				Math.random() * 2000 - 100
 			);
 			particle.rotation.y = -Math.PI;
 			scene.add(particle);
@@ -880,26 +881,20 @@ function init(level) {
 	}
 
 	function setFloor() {
-		const params = {
-			color: '#0055ff',
-			scale: 1,
-			flowX: 1,
-			flowY: 1
-		};
-
-		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshPhongMaterial({
-			color: '#83828b',
-			roughness: 0.8,
-			metalness: 0.4
-		}));
+		
+		
+		
+	    const floorMap = textureLoader.load("./lib/floor.jpg");
+		const floorMaterial = new THREE.MeshPhongMaterial({
+			specular: '#7c3327',
+			shininess: 1,
+			map:floorMap
+		});
+		floorMaterial.map.colorSpace = THREE.SRGBColorSpace;
+		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),floorMaterial );
 		mesh.rotation.x = -Math.PI / 2;
 		mesh.receiveShadow = true;
 		scene.add(mesh);
-		const grid = new THREE.GridHelper(4000, 20, 0x000000, 0x000000);
-		grid.material.opacity = 0.2;
-		grid.material.transparent = true;
-		scene.add(grid);
-
 	}
 
 
