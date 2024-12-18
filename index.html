@@ -216,9 +216,12 @@
 					<span style="font-size: 13px;color:blue">Thump up:move left<br />Thump down:move right<br />close
 						fist:shoot</span>
 					<hr />
-					<button class="btn_blue" style="width: 100%;height: 50px;font-size: 20px;">Load Game</button>
+					<button id="btn_load" class="btn_blue" style="width: 100%;height: 50px;font-size: 20px;">Load Game</button>
 					<button id="btn_start_1" class="btn_yellow"
 						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 1 player
+						Game</button>
+					<button id="btn_start_2" class="btn_yellow"
+						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 2 players
 						Game</button>
 
 				</div>
@@ -275,14 +278,14 @@
 						<h1 style="
                                 display: inline-block;
                                 vertical-align: middle;
-                            " v-bind:style="{ color: textColor, margin:'20px 0 0 0',fontSize:'32px',fontWeight:'600'}">
+                            " v-bind:style="{ color: textColor, margin:'5px 0 0 0',fontSize:'32px',fontWeight:'600'}">
 							{{model.name}}
 						</h1>
 						<div v-bind:style="{ backgroundColor: color,color:bgcolor}" style="
                                 width: 42px;
                                 height: 22px;
                                 border-radius: 5px;
-                                margin-top: 26px;
+                                margin-top: 5px;
                                 font-size: 14px;
                                 line-height: 22px;
                                 text-align: center;
@@ -294,7 +297,7 @@
                             ">
 							{{model.type.toUpperCase()}}
 						</div>
-						<div style="width: 100%; margin-top: 20px; display:block;padding: 10px;">
+						<div style="width: 100%; margin-top: 5px; display:block;padding: 10px;">
 							<div style="
                                     
                                     margin: auto;

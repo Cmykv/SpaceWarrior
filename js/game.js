@@ -67,7 +67,31 @@ let app = new Vue({
 let modal = document.getElementById("myModal");
 document.getElementById("btn_start_1").onclick = () => {
 	modal.style.display = "none";
-	init();
+	init(1);
+}
+
+document.getElementById("btn_start_2").onclick = () => {
+	modal.style.display = "none";
+	app.doublePlayer = true;
+	init(1);
+}
+
+document.getElementById("btn_load").onclick = () => {
+	modal.style.display = "none";
+	let xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+
+		if (this.readyState == 4 && this.status == 200) {
+			let jsonData = JSON.parse(this.responseText);
+			console.log(jsonData);
+			app.doublePlayer = jsonData.doublePlayer;
+			init(jsonData.gameLevel);
+		}
+
+
+	};
+	xhttp.open("GET", "data.json", true);
+	xhttp.send();
 }
 
 
@@ -183,7 +207,7 @@ function useHandpose() {
 
 
 
-function init() {
+function init(level) {
 
 	let player1 = {
 		id: 1,
@@ -227,7 +251,7 @@ function init() {
 		}
 	};
 
-	let gameLevel = 1;
+	let gameLevel = level;
 	let clock = new THREE.Clock();
 	// gltf and vrm
 	let loader = new FBXLoader();;
@@ -258,38 +282,38 @@ function init() {
 	   `;
 
 	const fragmentShader = document.getElementById("fragmentShader").textContent;
-	
+
 	const textureLoader = new THREE.TextureLoader();
-	
+
 	const smokeMap = textureLoader.load('./lib/smoke.png');
 
 	function setScene() {
-		 let smokeMaterial = new THREE.MeshLambertMaterial({
-		    color: new THREE.Color("rgb(83, 84, 255)"),
-		    map: smokeMap,
-		    transparent: true
-		  });
-		  let smokeGeo = new THREE.PlaneGeometry(100, 100);
+		let smokeMaterial = new THREE.MeshLambertMaterial({
+			color: new THREE.Color("rgb(255, 249, 75)"),
+			map: smokeMap,
+			transparent: true
+		});
+		let smokeGeo = new THREE.PlaneGeometry(100, 100);
 
-		  for (let p = 0; p < 150; p++) {
-		    let particle = new THREE.Mesh(smokeGeo, smokeMaterial);
-		    particle.position.set(
-		      Math.random() * 500 - 250,
-		      10,
-		      Math.random() * 1000 - 100
-		    );
-		    particle.rotation.y = -Math.PI;
-		    scene.add(particle);
-		    smokeParticles.push(particle);
-		  }
-		
+		for (let p = 0; p < 150; p++) {
+			let particle = new THREE.Mesh(smokeGeo, smokeMaterial);
+			particle.position.set(
+				Math.random() * 500 - 250,
+				10,
+				Math.random() * 1000 - 100
+			);
+			particle.rotation.y = -Math.PI;
+			scene.add(particle);
+			smokeParticles.push(particle);
+		}
+
 	}
-	
+
 	function evolveSmoke(delta) {
-	  let sp = smokeParticles.length;
-	  while (sp--) {
-	    smokeParticles[sp].rotation.z += delta * 0.2;
-	  }
+		let sp = smokeParticles.length;
+		while (sp--) {
+			smokeParticles[sp].rotation.z += delta * 0.2;
+		}
 	}
 
 
@@ -386,7 +410,7 @@ function init() {
 
 	}
 
-	
+
 
 
 	const diffuse = textureLoader.load('./lib/Carbon.png');
@@ -862,10 +886,11 @@ function init() {
 			flowX: 1,
 			flowY: 1
 		};
-		
+
 		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshPhongMaterial({
 			color: '#83828b',
-			roughness: 0.8, metalness: 0.4
+			roughness: 0.8,
+			metalness: 0.4
 		}));
 		mesh.rotation.x = -Math.PI / 2;
 		mesh.receiveShadow = true;
@@ -874,7 +899,7 @@ function init() {
 		grid.material.opacity = 0.2;
 		grid.material.transparent = true;
 		scene.add(grid);
-		
+
 	}
 
 
@@ -1111,15 +1136,15 @@ function init() {
 	}
 
 	function animate() {
-		
-		
+
+
 		wallArr.forEach(item => {
 			item.rotation.y += 0.01;
 
 		});
 		let bulletList = [];
 		bulletArr.forEach(item => {
-			if (item.alive && item.distance < 4000)
+			if (item.alive && item.distance < 5000)
 				bulletList.push(item);
 			else
 				scene.remove(item.obj)
@@ -1172,8 +1197,18 @@ function init() {
 				}
 				if (item.action === "rot") {
 					//item.lookAt(player1.model.position);
-					let dx = item.position.x - player1.model.position.x;
-					let dz = item.position.z - player1.model.position.z;
+					let target = player1;
+					if(app.doublePlayer)
+					{
+						let r=Math.floor(Math.random() * 100) + 1;
+						if(r%2==0)
+						{
+							target=player2;
+						}
+					}
+					
+					let dx = item.position.x - target.model.position.x;
+					let dz = item.position.z - target.model.position.z;
 					let da = Math.atan(dx / dz);
 					if (item.rotation.y < da) {
 						item.rotation.y += 0.01;
@@ -1201,9 +1236,9 @@ function init() {
 		});
 
 		let delta = clock.getDelta();
-		
+
 		evolveSmoke(delta);
-		
+
 		if (player1.animationMixer != null) {
 			player1.animationMixer.update(delta);
 		}
