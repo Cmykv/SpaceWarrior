@@ -136,9 +136,9 @@
 						}
 					}
 				</script>
-				<script type="x-shader/x-fragment" id="floorShader">
-					
-					uniform float iTime;
+		<script type="x-shader/x-fragment" id="floorShader">
+
+			uniform float iTime;
 					uniform vec2 iResolution;
 					void wave(inout float x, inout float y, inout float z, float T, int octaves, float a)
 					{
@@ -198,9 +198,9 @@
 					    gl_FragColor = vec4(col,1.0);
 					}
 					</script>
-				
-				<script type="x-shader/x-fragment" id="fragmentShader">						
-						uniform float iTime;
+
+		<script type="x-shader/x-fragment" id="fragmentShader">
+			uniform float iTime;
 						uniform vec2 iResolution;
 						int iterations=17;
 						float formuparam=0.53;
@@ -277,12 +277,13 @@
 					<span style="font-size: 13px;color:blue">Thump up:move left<br />Thump down:move right<br />close
 						fist:shoot</span>
 					<hr />
-					<button id="btn_load" class="btn_blue" style="width: 100%;height: 50px;font-size: 20px;">Load Game</button>
+					<button id="btn_load" class="btn_blue" style="width: 100%;height: 50px;font-size: 20px;">Load
+						Game</button>
 					<button id="btn_start_1" class="btn_yellow"
-						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 1 player
+						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 5px;">Start 1 player
 						Game</button>
 					<button id="btn_start_2" class="btn_yellow"
-						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 30px;">Start 2 players
+						style="width: 100%;height: 50px;font-size: 20px;color:black;margin-top: 5px;">Start 2 players
 						Game</button>
 
 				</div>
@@ -383,8 +384,11 @@
 							<h3 v-if="doublePlayer" style="color:blue">
 								Player 2 :score:{{player2Score}}&nbsp;&nbsp;&nbsp;&nbsp;life:{{player2Life}}
 							</h3>
-							<button id="btn_set" class="btn_blue" style="width:200px;height:40px">Use hand
+							<button id="btn_set" class="btn_blue" style="width:160px;height:40px">Use hand
 								control</button>
+
+							<button id="btn_save" class="btn_yellow"
+								style="width:80px;height:40px;color:black">Save</button>
 
 
 						</div>

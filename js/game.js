@@ -222,8 +222,9 @@ function init(level) {
 		damage: 20,
 		score: 0,
 		alive: true,
-		life: 10,
-		foot: null
+		life: 50,
+		foot: null,
+		shootHelper: null
 	};
 	let player2 = {
 		id: 2,
@@ -238,8 +239,9 @@ function init(level) {
 		damage: 20,
 		score: 0,
 		alive: true,
-		life: 10,
-		foot: null
+		life: 50,
+		foot: null,
+		shootHelper: null
 	};
 
 	const uniforms = {
@@ -267,11 +269,11 @@ function init(level) {
 	let monsterCreated = true;
 	let water = null;
 
-
 	let composer, effectFXAA, outlinePass;
 	let selectedObjects = [];
 	let audioObject = [];
 	let smokeParticles = [];
+	let enemyModel = null;
 
 
 
@@ -282,7 +284,7 @@ function init(level) {
 	   `;
 
 	const fragmentShader = document.getElementById("fragmentShader").textContent;
-	const floorShader =  document.getElementById("floorShader").textContent;
+	const floorShader = document.getElementById("floorShader").textContent;
 
 	const textureLoader = new THREE.TextureLoader();
 
@@ -547,9 +549,9 @@ function init(level) {
 		group.angle = 0;
 		group.life = 100;
 		group.action = "move";
-		group.moveDuration = 900;
-		group.rotDuration = 500;
-		group.fireDuration = 600;
+		group.moveDuration = 1000;
+		group.rotDuration = 1000;
+		group.fireDuration = 5000;
 		group.direction = [0, 0];
 		group.actionClock = 0;
 		group.targetRot = 0;
@@ -564,83 +566,24 @@ function init(level) {
 	function momsterBegin() {
 		createMonster();
 	}
-	/*
-	 */
-	function monsterAct(monster) {
-		//console.log(monster);
-		let t = Date.now();
-		let randomNumber = Math.floor(Math.random() * 2);
-		let directionRandom = Math.floor(Math.random() * 4);
-		if (monster.action === "move") {
-			if (t - monster.actionClock > monster.moveDuration) {
-				monster.action = randomNumber > 0 ? "rot" : "move";
-				if (monster.action == "move") {
-					switch (directionRandom) {
-						case 0:
-							monster.direction = [0, 1];
-						case 1:
-							monster.direction = [0, -1];
-						case 2:
-							monster.direction = [1, 0];
-						case 3:
-							monster.direction = [-1, 0];
-					}
-				} else {
 
-				}
-				monster.actionClock = t;
-			}
-		}
-		if (monster.action === "rot") {
-			if (t - monster.actionClock > monster.rotDuration) {
-
-				monster.action = "fire";
-				monster.fired = false;
-				monster.actionClock = t;
-			}
-		}
-		if (monster.action === "fire") {
-			if (t - monster.actionClock > monster.fireDuration) {
-				monster.action = "move";
-				monster.actionClock = t;
-			}
-		}
-	}
 
 
 	function createMonster() {
 		let num = gameLevel + 0;
 		for (let i = 0; i < num; i++) {
 			let x = -200 + i * 250;;
-			let y = 10;
+			let y = 0;
 			let z = 2500;
-			const group = new THREE.Group();
-			const g1 = new THREE.CylinderGeometry(50, 60, 100, 20);
-			const m1 = new THREE.MeshPhongMaterial({
-				color: "#0000ff"
-			});
-			const g2 = new THREE.SphereGeometry(40, 40, 20);
-			const m2 = new THREE.MeshPhongMaterial({
-				color: "#ffff7f"
-			});
-
-			const g3 = new THREE.CylinderGeometry(10, 10, 80, 20);
-			const m3 = new THREE.MeshPhongMaterial({
-				color: "#aa5500"
-			});
-
-			const body = new THREE.Mesh(g1, m1);
-			const head = new THREE.Mesh(g2, m2);
-			const gun = new THREE.Mesh(g3, m3);
-			gun.position.set(0, 100, -40);
-			gun.rotation.x = Math.PI / 2;
-
-			head.position.set(0, 90, 0);
-
-			group.add(body);
-			group.add(head);
-			group.add(gun);
+			const group = SkeletonUtils.clone(enemyModel);
 			group.position.set(x, y, z);
+			group.animationMixer = new THREE.AnimationMixer(group);
+			group.actions = [];
+			group.actions["idle"] = group.animationMixer.clipAction(clipActions[8]);
+			group.actions["idle"].setEffectiveTimeScale(0.5);
+			group.actions["death"] = group.animationMixer.clipAction(clipActions[7]);
+			group.actions["shoot"] = group.animationMixer.clipAction(clipActions[6]);
+			group.lookAt(0, 0, 0);
 			group.bom = false;
 			group.bomTimer = 0;
 			group.bomSpeed = 5;
@@ -648,18 +591,49 @@ function init(level) {
 			group.speed = 5;
 			group.angle = 0;
 			group.life = 20;
-			group.action = "move";
+			group.action = "idle";
 			group.moveDuration = 900;
 			group.rotDuration = 500;
 			group.fireDuration = 600;
-			group.direction = [0, 0];
-			group.actionClock = 0;
+			group.actionClock = Date.now();
 			group.targetRot = 0;
 			group.fired = false;
+
 			scene.add(group);
+			group.currentAction = group.actions["idle"];
+			group.currentAction.play();
 			monsterArr.push(group);
 		}
 		monsterCreated = true;
+	}
+
+	/*
+	 */
+	function monsterAct(monster) {
+		//console.log(monster);
+		let t = Date.now();
+		if (monster.action == "idle") {
+			monster.translateZ( 0.5);
+			if(t-monster.actionClock>3000)
+			{
+				
+				monster.action="fire";
+				switchMonsterAction(monster,"shoot",0.5);
+				monster.actionClock=t;
+			}
+		}
+		if (monster.action == "fire") {
+			if(t-monster.actionClock>1200)
+			{
+				
+				monster.action="idle";
+				monster.actions["idle"].setEffectiveTimeScale(0.5);
+				switchMonsterAction(monster,"idle",0.5);
+				monster.actionClock=t;
+			}
+		}
+		
+		
 	}
 
 	function levelUp() {
@@ -670,15 +644,22 @@ function init(level) {
 
 
 	function bomMonster(monster) {
+
 		monster.traverse(function(obj) {
 			// 判断子对象是否是物体，如果是，更改其颜色
 			if (obj.isMesh) {
-				obj.material.color.set(0xff0000);
+				obj.material = new THREE.MeshPhongMaterial({
+					color: 0xff0000, // 设置材质颜色
+					specular: 0xffffff, // 设置高光颜色
+					shininess: 100, // 设置高光强度
+					combine: THREE.MixOperation, // 设置环境映射的混合模式
+					reflectivity: 1 // 设置材质的反射强度
+				});
 			}
-		})
+		});
 		monster.bom = true;
 		monster.alive = false;
-		audioObject["boom"].play();
+		//audioObject["boom"].play();
 	}
 
 
@@ -690,7 +671,9 @@ function init(level) {
 		"./model/idle.fbx",
 		"./model/jumping.fbx",
 		"./model/shooting.fbx",
-		"./model/death.fbx"
+		"./model/death.fbx",
+		"./model/monster_walk.fbx",
+		"./model/m3.fbx"
 	];
 
 	let clipActions = [];
@@ -717,7 +700,11 @@ function init(level) {
 
 					loader.load(resFile, function(obj) {
 
-						clipActions.push(obj.animations[0]);
+						if (resFile.endsWith("m3.fbx")) {
+							enemyModel = obj;
+						} else {
+							clipActions.push(obj.animations[0]);
+						}
 
 						resIndex++;
 
@@ -757,6 +744,7 @@ function init(level) {
 		if (!app.doublePlayer) {
 			player2.model.visible = false;
 			player2.foot.visible = false;
+			player2.shootHelper.visible = false;
 		}
 
 
@@ -786,6 +774,9 @@ function init(level) {
 		player1.currentActionName = "idle";
 		player2.currentAction = player2.actions["idle"];
 		player2.currentActionName = "idle";
+
+		//////////////////////////////////////
+
 		momsterBegin();
 		animate();
 
@@ -821,6 +812,19 @@ function init(level) {
 		circle.rotation.x = Math.PI / 2;
 		player.foot = circle;
 		scene.add(circle);
+
+
+		const points = [];
+		points.push(new THREE.Vector3(0, 0, 0));
+		points.push(new THREE.Vector3(0, 0, 3000));
+		const sline = new THREE.BufferGeometry().setFromPoints(points);
+		let lineMaterial = new THREE.LineBasicMaterial({
+			color: 0xffffff
+		});
+		let line = new THREE.Line(sline, lineMaterial);
+		line.position.set(pos.x, 120, pos.z);
+		scene.add(line);
+		player.shootHelper = line;
 	}
 
 	function setHelper() {
@@ -879,19 +883,51 @@ function init(level) {
 			//console.log("need to fire");
 		}
 	}
+	
+	function switchMonsterAction(player, newActionName, fadeDuration = 0.1) {
+		if (newActionName !== 'death' && newActionName !== 'idle' && !player.alive) {
+			return;
+		}
+		console.log("switch to action " + newActionName, player.id)
+		const newAction = player.actions[newActionName];
+		if (newAction && player.currentAction !== newAction) {
+			player.previousAction = player.currentAction;
+			if (player.previousAction) {
+				player.previousAction.fadeOut(fadeDuration);
+			}
+	
+			if (newActionName === 'jump' || newActionName === 'death' ||
+				newActionName === 'walk_forward' || newActionName === 'shoot' ||
+				newActionName === 'walk_backward' || newActionName === 'walk_left' ||
+				newActionName === 'walk_right') {
+				newAction.loop = THREE.LoopOnce;
+				newAction.clampWhenFinished = true;
+			}
+	
+			player.currentAction = newAction;
+	
+			player.currentAction.reset();
+			
+			player.currentAction.setEffectiveTimeScale(0.5);
+			player.currentAction.setEffectiveWeight(1);
+			player.currentAction.fadeIn(fadeDuration).play();
+		} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
+			//console.log("need to fire");
+		}
+	}
 
 	function setFloor() {
-		
-		
-		
-	    const floorMap = textureLoader.load("./lib/floor.jpg");
+
+
+
+		const floorMap = textureLoader.load("./lib/floor.jpg");
 		const floorMaterial = new THREE.MeshPhongMaterial({
-			specular: '#7c3327',
+			specular: '#cf9886',
 			shininess: 1,
-			map:floorMap
+			map: floorMap
 		});
 		floorMaterial.map.colorSpace = THREE.SRGBColorSpace;
-		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),floorMaterial );
+		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), floorMaterial);
 		mesh.rotation.x = -Math.PI / 2;
 		mesh.receiveShadow = true;
 		scene.add(mesh);
@@ -956,7 +992,7 @@ function init(level) {
 
 
 	// scene
-	setScene();
+	//setScene();
 	setBackground();
 	setFloor();
 	setLight();
@@ -974,6 +1010,8 @@ function init(level) {
 		player2Color: "none",
 		player1Halo: true,
 		player2Halo: true,
+		player1ShootHelper: true,
+		player2ShootHelper: true,
 	};
 	const gui = new GUI({
 		width: 280
@@ -989,6 +1027,11 @@ function init(level) {
 	gui.add(params, 'player1Halo').onChange(function(value) {
 
 		player1.foot.visible = value;
+
+	});
+	gui.add(params, 'player1ShootHelper').onChange(function(value) {
+
+		player1.shootHelper.visible = value;
 
 	});
 	gui.add(params, 'player1Color', colors).onChange(function(value) {
@@ -1018,6 +1061,11 @@ function init(level) {
 		gui.add(params, 'player2Halo').onChange(function(value) {
 
 			player2.foot.visible = value;
+
+		});
+		gui.add(params, 'player2ShootHelper').onChange(function(value) {
+
+			player2.shootHelper.visible = value;
 
 		});
 		gui.add(params, 'player2Color', colors).onChange(function(value) {
@@ -1075,6 +1123,7 @@ function init(level) {
 				let dz = 2;
 				player.model.position.z += dz;
 				player.foot.position.z = player.model.position.z;
+				player.shootHelper.position.z = player.model.position.z;
 			}
 		}
 		if (
@@ -1092,6 +1141,7 @@ function init(level) {
 				let dz = -2;
 				player.model.position.z += dz;
 				player.foot.position.z = player.model.position.z;
+				player.shootHelper.position.z = player.model.position.z;
 			}
 		}
 		if (
@@ -1106,9 +1156,10 @@ function init(level) {
 				}
 			})
 			if (canMove) {
-				let dx = 2;
+				let dx = 4;
 				player.model.position.x += dx;
 				player.foot.position.x = player.model.position.x;
+				player.shootHelper.position.x = player.model.position.x;
 			}
 		}
 		if (
@@ -1123,9 +1174,10 @@ function init(level) {
 				}
 			})
 			if (canMove) {
-				let dx = -2;
+				let dx = -4;
 				player.model.position.x += dx;
 				player.foot.position.x = player.model.position.x;
+				player.shootHelper.position.x = player.model.position.x;
 			}
 		}
 	}
@@ -1180,53 +1232,9 @@ function init(level) {
 
 			if (item.alive) {
 				monsterAct(item);
-				if (item.action === "move") {
-					item.translateX(item.direction[0] * 0.5);
-					item.translateZ(item.direction[1] * 0.5);
-				}
-				if (item.action === "fire") {
-					if (item.fired == false) {
-						createMonsterBullet(item);
-						item.fired = true;
-					}
-				}
-				if (item.action === "rot") {
-					//item.lookAt(player1.model.position);
-					let target = player1;
-					if(app.doublePlayer)
-					{
-						let r=Math.floor(Math.random() * 100) + 1;
-						if(r%2==0)
-						{
-							target=player2;
-						}
-					}
-					
-					let dx = item.position.x - target.model.position.x;
-					let dz = item.position.z - target.model.position.z;
-					let da = Math.atan(dx / dz);
-					if (item.rotation.y < da) {
-						item.rotation.y += 0.01;
-					} else {
-						item.rotation.y -= 0.01;
-					}
-				}
 			}
 			if (item.bom) {
-				item.traverse(function(child) {
-					// 判断子对象是否是物体，如果是，更改其颜色
-					if (child.isMesh) {
-						let dir = new THREE.Vector3().copy(child.position.clone().normalize())
-						//console.log(dir);
-						let dx = dir.x * item.bomSpeed;
-						let dy = dir.y * item.bomSpeed;
-						let dz = dir.z * item.bomSpeed;
-						child.position.x += dx;
-						child.position.y += dy;
-						child.position.z += dz;
-					}
-				})
-				item.bomTimer += 1;
+
 			}
 		});
 
@@ -1240,6 +1248,13 @@ function init(level) {
 		if (app.doublePlayer && player2.animationMixer != null) {
 			player2.animationMixer.update(delta);
 		}
+		monsterArr.forEach(item => {
+
+			if (item.alive) {
+				item.animationMixer.update(delta);
+			}
+		});
+
 		handleActions(player1);
 		if (app.doublePlayer)
 			handleActions(player2);
@@ -1253,8 +1268,8 @@ function init(level) {
 			if (item.alive) {
 				let boxMeshBox = new THREE.Box3().setFromObject(item);
 				if (playerBox.intersectsBox(boxMeshBox)) {
-					player1.life -= 100;
-					item.life -= 100;
+					//player1.life -= 100;
+					//item.life -= 100;
 
 				}
 				if (playerBox2 && playerBox2.intersectsBox(boxMeshBox)) {
@@ -1265,7 +1280,7 @@ function init(level) {
 				wallArr.forEach(wall => {
 					let wallMeshBox = new THREE.Box3().setFromObject(wall);
 					if (wallMeshBox.intersectsBox(boxMeshBox)) {
-						item.life -= 100;
+						//item.life -= 100;
 					}
 				})
 				bulletArr.filter(x => x.human).forEach(bullet => {
