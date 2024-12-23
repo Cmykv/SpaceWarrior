@@ -26,14 +26,31 @@ import {
 
 import {
 	Water
-} from 'three/addons/objects/Water2.js';
-
+} from 'three/addons/objects/Water.js';
 import {
 	TextGeometry
 } from 'three/addons/geometries/TextGeometry.js';
 import {
 	FontLoader
 } from 'three/addons/loaders/FontLoader.js';
+import {
+	EffectComposer
+} from 'three/addons/postprocessing/EffectComposer.js';
+import {
+	RenderPass
+} from 'three/addons/postprocessing/RenderPass.js';
+import {
+	ShaderPass
+} from 'three/addons/postprocessing/ShaderPass.js';
+import {
+	OutlinePass
+} from 'three/addons/postprocessing/OutlinePass.js';
+import {
+	OutputPass
+} from 'three/addons/postprocessing/OutputPass.js';
+import {
+	FXAAShader
+} from 'three/addons/shaders/FXAAShader.js';
 
 
 import {
@@ -279,12 +296,49 @@ function init(level) {
 	let particleLight;
 	let monsterCreated = true;
 	let water = null;
-
-	let composer, effectFXAA, outlinePass;
 	let selectedObjects = [];
+	let composer, effectFXAA, outlinePass;
 	let audioObject = [];
 	let smokeParticles = [];
 	let enemyModel = null;
+	const renderer = new THREE.WebGLRenderer({
+		antialias: true
+	});
+	renderer.setPixelRatio(window.devicePixelRatio);
+	renderer.setSize(
+		innerWidth,
+		innerHeight
+	);
+	renderer.shadowMap.enabled = true;
+
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+	//renderer.autoClear = false;
+	renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
+	//ReinhardToneMapping
+	renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
+	renderer.toneMappingExposure = 0.9; // 色调映射曝光
+	renderer.setPixelRatio(window.devicePixelRatio);
+	//renderer.setClearColor(0x000000, 1); //设置背景颜色
+	document.querySelector("#model").appendChild(renderer.domElement);
+	const stats = new Stats();
+	stats.showPanel(0);
+	document.querySelector('#model').appendChild(stats.domElement);
+
+
+
+
+
+	// camera
+	const camera = new THREE.PerspectiveCamera(
+		50,
+		document.querySelector("#model").clientWidth /
+		document.querySelector("#model").clientHeight,
+		1,
+		5000.0
+	);
+	camera.position.set(0, 200, -1000);
+	camera.lookAt(0, 0, 0);
 
 
 
@@ -312,15 +366,68 @@ function init(level) {
 		for (let p = 0; p < 150; p++) {
 			let particle = new THREE.Mesh(smokeGeo, smokeMaterial);
 			particle.position.set(
-				Math.random() * 2000 - 250,
+				Math.random() * 3000 - 250,
 				0,
-				Math.random() * 2000 - 100
+				Math.random() * 3000 + 200
 			);
 			particle.rotation.y = -Math.PI;
 			scene.add(particle);
 			smokeParticles.push(particle);
 		}
 
+		const params1 = {
+			color: '#aa0000',
+			scale: 50,
+			flowX: 50,
+			flowY: 50
+		};
+
+		const waterGeometry = new THREE.PlaneGeometry(500, 500);
+
+		water = new Water(
+			waterGeometry, {
+				textureWidth: 512,
+				textureHeight: 512,
+				waterNormals: new THREE.TextureLoader().load('./lib/waternormals.jpg', function(texture) {
+
+					texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+
+				}),
+				sunDirection: new THREE.Vector3(),
+				sunColor: 0xffffff,
+				waterColor: 0x0000ff,
+				distortionScale: 50,
+				fog: scene.fog !== undefined
+			}
+		);
+
+		water.position.y = 1;
+		water.rotation.x = Math.PI * - 0.5;
+
+		scene.add(water);
+
+	}
+
+	function setComposer() {
+		composer = new EffectComposer(renderer);
+
+		const renderPass = new RenderPass(scene, camera);
+		composer.addPass(renderPass);
+
+		outlinePass = new OutlinePass(new THREE.Vector2(innerWidth, innerHeight), scene, camera);
+		outlinePass.edgeStrength = Number(3);
+		outlinePass.edgeGlow = Number(0.1);
+		outlinePass.edgeThickness = Number(1);
+		outlinePass.pulsePeriod = Number(0);
+		outlinePass.visibleEdgeColor.set('#ffffff');
+		outlinePass.hiddenEdgeColor.set('#190a05');
+		composer.addPass(outlinePass);
+		const outputPass = new OutputPass();
+		composer.addPass(outputPass);
+
+		effectFXAA = new ShaderPass(FXAAShader);
+		effectFXAA.uniforms['resolution'].value.set(1 / innerWidth, 1 / innerHeight);
+		composer.addPass(effectFXAA);
 	}
 
 	function evolveSmoke(delta) {
@@ -392,7 +499,7 @@ function init(level) {
 
 		const dirLight = new THREE.DirectionalLight(0xffffff, 5);
 		dirLight.color.setHSL(0.1, 1, 0.95);
-		dirLight.position.set(0, 500, 300);
+		dirLight.position.set(0, 500, -300);
 		dirLight.castShadow = true;
 		dirLight.shadow.mapSize.width = 500;
 		dirLight.shadow.mapSize.height = 500;
@@ -537,8 +644,8 @@ function init(level) {
 	function beShoot(player) {
 		tween = new Tween(camera.position);
 		tween.to({
-				y:210
-			}, 80) 
+				y: 210
+			}, 80)
 			.onUpdate(() => {})
 			.yoyo(true)
 			.repeat(1)
@@ -598,13 +705,13 @@ function init(level) {
 
 	function randomColor(model) {
 		model.traverse(function(obj) {
-			// 判断子对象是否是物体，如果是，更改其颜色
 			if (obj.isMesh) {
 				obj.material = new THREE.MeshPhongMaterial({
-					color: getRandomColor(), // 设置材质颜色
-					specular: '#0000ff', // 设置高光颜色
-					combine: THREE.MixOperation, // 设置环境映射的混合模式
-					reflectivity: 1 // 设置材质的反射强度
+					color: getRandomColor(),
+					specular: '#0000ff',
+					combine: THREE.MixOperation,
+					reflectivity: 1,
+					shininess: 5
 				});
 			}
 		});
@@ -700,13 +807,13 @@ function init(level) {
 		fontLoader.load("./lib/gentilis_bold.typeface.json", function(font) {
 			const geometry = new TextGeometry('Level Up!', {
 				font: font,
-				size: 100, //字体大小，默认值为100
-				height: 5, //挤出文本的厚度。默认值为50
-				curveSegments: 12, //表示文本的）曲线上点的数量。默认值为12
-				bevelEnabled: true, //是否开启斜角，默认为false
-				bevelThickness: 10, //文本上斜角的深度，默认值为20
-				bevelSize: 2, //斜角与原始文本轮廓之间的延伸距离。默认值为8
-				bevelSegments: 5 //斜角的分段数。默认值为3
+				size: 100,
+				height: 5,
+				curveSegments: 12,
+				bevelEnabled: true,
+				bevelThickness: 10,
+				bevelSize: 2,
+				bevelSegments: 5
 			});
 			const material = new THREE.MeshPhongMaterial({
 				color: 0xff0000
@@ -729,13 +836,13 @@ function init(level) {
 		fontLoader.load("./lib/gentilis_bold.typeface.json", function(font) {
 			const geometry = new TextGeometry('Game over!', {
 				font: font,
-				size: 100, //字体大小，默认值为100
-				height: 5, //挤出文本的厚度。默认值为50
-				curveSegments: 12, //表示文本的）曲线上点的数量。默认值为12
-				bevelEnabled: true, //是否开启斜角，默认为false
-				bevelThickness: 10, //文本上斜角的深度，默认值为20
-				bevelSize: 2, //斜角与原始文本轮廓之间的延伸距离。默认值为8
-				bevelSegments: 5 //斜角的分段数。默认值为3
+				size: 100,
+				height: 5,
+				curveSegments: 12,
+				bevelEnabled: true,
+				bevelThickness: 10,
+				bevelSize: 2,
+				bevelSegments: 5
 			});
 			const material = new THREE.MeshPhongMaterial({
 				color: 0xff0000
@@ -764,14 +871,14 @@ function init(level) {
 		if (monster.bom)
 			return;
 		monster.traverse(function(obj) {
-			// 判断子对象是否是物体，如果是，更改其颜色
+
 			if (obj.isMesh) {
 				obj.material = new THREE.MeshPhongMaterial({
-					color: 0xff0000, // 设置材质颜色
-					specular: 0xffffff, // 设置高光颜色
-					shininess: 100, // 设置高光强度
-					combine: THREE.MixOperation, // 设置环境映射的混合模式
-					reflectivity: 1 // 设置材质的反射强度
+					color: 0xff0000,
+					specular: 0xffffff,
+					shininess: 100,
+					combine: THREE.MixOperation,
+					reflectivity: 1
 				});
 			}
 		});
@@ -818,7 +925,8 @@ function init(level) {
 
 					loader.load(resFile, function(obj) {
 
-						if (resFile.endsWith("Mousey.fbx")) {
+						if (resFile.endsWith("m3.fbx")) {
+
 							enemyModel = obj;
 						} else {
 							clipActions.push(obj.animations[0]);
@@ -892,6 +1000,10 @@ function init(level) {
 		player1.currentActionName = "idle";
 		player2.currentAction = player2.actions["idle"];
 		player2.currentActionName = "idle";
+
+		selectedObjects = [];
+		selectedObjects.push(player1.model);
+		outlinePass.selectedObjects = selectedObjects;
 
 		//////////////////////////////////////
 
@@ -1044,7 +1156,7 @@ function init(level) {
 
 		const floorMap = textureLoader.load("./lib/floor.jpg");
 		const floorMaterial = new THREE.MeshPhongMaterial({
-			specular: '#cf9886',
+			specular: '#785b05',
 			shininess: 1,
 			map: floorMap
 		});
@@ -1058,43 +1170,7 @@ function init(level) {
 
 
 
-	const renderer = new THREE.WebGLRenderer({
-		antialias: true
-	});
-	renderer.setPixelRatio(window.devicePixelRatio);
-	renderer.setSize(
-		document.querySelector("#model").clientWidth,
-		document.querySelector("#model").clientHeight
-	);
-	renderer.shadowMap.enabled = true;
 
-	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-	//renderer.autoClear = false;
-	renderer.outputEncoding = THREE.sRGBEncoding; // 输出编码
-	//ReinhardToneMapping
-	renderer.toneMapping = THREE.ACESFilmicToneMapping; // 色调映射
-	renderer.toneMappingExposure = 0.9; // 色调映射曝光
-	renderer.setPixelRatio(window.devicePixelRatio);
-	//renderer.setClearColor(0x000000, 1); //设置背景颜色
-	document.querySelector("#model").appendChild(renderer.domElement);
-	const stats = new Stats();
-	stats.showPanel(0);
-	document.querySelector('#model').appendChild(stats.domElement);
-
-
-
-
-	// camera
-	const camera = new THREE.PerspectiveCamera(
-		50,
-		document.querySelector("#model").clientWidth /
-		document.querySelector("#model").clientHeight,
-		1,
-		5000.0
-	);
-	camera.position.set(0, 200, -1000);
-	camera.lookAt(0, 0, 0);
 
 
 	window.addEventListener(
@@ -1118,6 +1194,7 @@ function init(level) {
 	setBackground();
 	setFloor();
 	setLight();
+	setComposer();
 	setHelper();
 	setControll();
 	createWall();
@@ -1125,6 +1202,7 @@ function init(level) {
 	loadMp3();
 
 	let colors = ["red", "blue", "green"];
+
 	const params = {
 		showPlayer1Skeleton: false,
 		showPlayer2Skeleton: false,
@@ -1134,12 +1212,19 @@ function init(level) {
 		player2Halo: true,
 		player1ShootHelper: true,
 		player2ShootHelper: true,
+		useComposer: false
 	};
 	const gui = new GUI({
 		width: 280
 	});
 	gui.domElement.id = 'gui';
 	gui.domElement.style.marginTop = '450px';
+
+	gui.add(params, 'useComposer').onChange(function(value) {
+
+		params.useComposer = value;
+
+	});
 
 	gui.add(params, 'showPlayer1Skeleton').onChange(function(value) {
 
@@ -1459,6 +1544,7 @@ function init(level) {
 		app.player2Score = player2.score;
 		app.level = gameLevel;
 		uniforms.iTime.value += 0.05;
+		water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
 		stats.update();
 
 		const timer = Date.now() * 0.000025;
@@ -1488,7 +1574,10 @@ function init(level) {
 		if (tween) {
 			tween.update();
 		}
-		renderer.render(scene, camera);
+		if (params.useComposer)
+			composer.render();
+		else
+			renderer.render(scene, camera);
 		requestAnimationFrame(animate);
 	}
 
