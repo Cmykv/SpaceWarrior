@@ -942,7 +942,7 @@ function init(level) {
 		if (app.online) {
 			if ('WebSocket' in window) {
 
-				ws = new WebSocket('ws://127.0.0.1:80/websocket');
+				ws = new WebSocket('ws://122.51.11.127:80/websocket');
 
 				ws.onopen = () => {
 					console.log('websocket success---');
@@ -1196,7 +1196,7 @@ function init(level) {
 		if (newActionName !== 'death' && newActionName !== 'idle' && !player.alive) {
 			return;
 		}
-		console.log("switch to action " + newActionName, player.id)
+		//console.log("switch to action " + newActionName, player.id)
 		const newAction = player.actions[newActionName];
 		if (newAction && player.currentAction !== newAction) {
 			player.previousAction = player.currentAction;
