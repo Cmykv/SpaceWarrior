@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import {
+	Tween
+} from 'three/addons/libs/tween.module.js';
 
 import Stats from 'three/addons/libs/stats.module.js';
 
@@ -24,6 +27,14 @@ import {
 import {
 	Water
 } from 'three/addons/objects/Water2.js';
+
+import {
+	TextGeometry
+} from 'three/addons/geometries/TextGeometry.js';
+import {
+	FontLoader
+} from 'three/addons/loaders/FontLoader.js';
+
 
 import {
 	GestureRecognizer,
@@ -222,7 +233,7 @@ function init(level) {
 		damage: 20,
 		score: 0,
 		alive: true,
-		life: 50,
+		life: 10,
 		foot: null,
 		shootHelper: null
 	};
@@ -239,7 +250,7 @@ function init(level) {
 		damage: 20,
 		score: 0,
 		alive: true,
-		life: 50,
+		life: 10,
 		foot: null,
 		shootHelper: null
 	};
@@ -302,7 +313,7 @@ function init(level) {
 			let particle = new THREE.Mesh(smokeGeo, smokeMaterial);
 			particle.position.set(
 				Math.random() * 2000 - 250,
-				10,
+				0,
 				Math.random() * 2000 - 100
 			);
 			particle.rotation.y = -Math.PI;
@@ -454,7 +465,7 @@ function init(level) {
 	earthMaterial.map.colorSpace = THREE.SRGBColorSpace;
 
 	function createWall() {
-		for (let i = 0; i < 2; i++) {
+		for (let i = 0; i < 1; i++) {
 			let cubeGeometry = new THREE.SphereGeometry(100, 200, 100);
 			let cube = new THREE.Mesh(cubeGeometry, i == 0 ? earthMaterial : material);
 			cube.position.x = 500;
@@ -513,7 +524,7 @@ function init(level) {
 		let bullet = {};
 		bullet.obj = sphere;
 		bullet.speed = 10;
-		bullet.angle = monster.rotation.y;;
+		bullet.angle = 0;
 		bullet.distance = 0;
 		bullet.alive = true;
 		bullet.id = 3;
@@ -521,6 +532,18 @@ function init(level) {
 		bulletArr.push(bullet);
 	}
 
+	let tween = null;
+
+	function beShoot(player) {
+		tween = new Tween(camera.position);
+		tween.to({
+				y:210
+			}, 80) 
+			.onUpdate(() => {})
+			.yoyo(true)
+			.repeat(1)
+			.start();
+	}
 
 
 
@@ -568,22 +591,43 @@ function init(level) {
 	}
 
 
+	function getRandomColor() {
+		let colorArray = new Float32Array([Math.random(), Math.random(), Math.random()]);
+		return 0xFFFFFF * Math.random();
+	}
+
+	function randomColor(model) {
+		model.traverse(function(obj) {
+			// 判断子对象是否是物体，如果是，更改其颜色
+			if (obj.isMesh) {
+				obj.material = new THREE.MeshPhongMaterial({
+					color: getRandomColor(), // 设置材质颜色
+					specular: '#0000ff', // 设置高光颜色
+					combine: THREE.MixOperation, // 设置环境映射的混合模式
+					reflectivity: 1 // 设置材质的反射强度
+				});
+			}
+		});
+	}
+
+
 
 	function createMonster() {
 		let num = gameLevel + 0;
 		for (let i = 0; i < num; i++) {
-			let x = -200 + i * 250;;
+			let x = -500 + i * 400;;
 			let y = 0;
 			let z = 2500;
-			const group = SkeletonUtils.clone(enemyModel);
-			group.position.set(x, y, z);
+			const group = SkeletonUtils.clone(player1.model);
+			randomColor(group);
 			group.animationMixer = new THREE.AnimationMixer(group);
 			group.actions = [];
 			group.actions["idle"] = group.animationMixer.clipAction(clipActions[8]);
 			group.actions["idle"].setEffectiveTimeScale(0.5);
 			group.actions["death"] = group.animationMixer.clipAction(clipActions[7]);
 			group.actions["shoot"] = group.animationMixer.clipAction(clipActions[6]);
-			group.lookAt(0, 0, 0);
+			group.rotation.y = Math.PI;
+			group.position.set(x, y, z);
 			group.bom = false;
 			group.bomTimer = 0;
 			group.bomSpeed = 5;
@@ -599,6 +643,12 @@ function init(level) {
 			group.targetRot = 0;
 			group.fired = false;
 
+
+			//let box = new THREE.Box3().setFromObject(group);
+			//const helper = new THREE.Box3Helper( box, 0xff0000 );
+			//helper.updateWorldMatrix();
+			//scene.add( helper );
+
 			scene.add(group);
 			group.currentAction = group.actions["idle"];
 			group.currentAction.play();
@@ -613,30 +663,97 @@ function init(level) {
 		//console.log(monster);
 		let t = Date.now();
 		if (monster.action == "idle") {
-			monster.translateZ( 0.5);
-			if(t-monster.actionClock>3000)
-			{
-				
-				monster.action="fire";
-				switchMonsterAction(monster,"shoot",0.5);
-				monster.actionClock=t;
+			monster.translateZ(0.5);
+			if (t - monster.actionClock > 3000) {
+
+				monster.action = "fire";
+				monster.fired = false;
+				switchMonsterAction(monster, "shoot", 0.5);
+				monster.actionClock = t;
 			}
 		}
 		if (monster.action == "fire") {
-			if(t-monster.actionClock>1200)
-			{
-				
-				monster.action="idle";
+			if (!monster.fired && (monster.currentAction.time >= monster.currentAction.getClip().duration)) {
+				console.log("monster fired");
+				createMonsterBullet(monster);
+				monster.fired = true;
+				monster.action = "idle";
 				monster.actions["idle"].setEffectiveTimeScale(0.5);
-				switchMonsterAction(monster,"idle",0.5);
-				monster.actionClock=t;
+				switchMonsterAction(monster, "idle", 0.5);
+				monster.actionClock = t;
+			}
+
+		}
+		if (monster.action == "death") {
+			if (monster.currentAction.time >= monster.currentAction.getClip().duration) {
+				monster.alive = false;
 			}
 		}
-		
-		
+
+
 	}
 
+	let fontMesh = null;
+
 	function levelUp() {
+		const fontLoader = new FontLoader();
+		fontLoader.load("./lib/gentilis_bold.typeface.json", function(font) {
+			const geometry = new TextGeometry('Level Up!', {
+				font: font,
+				size: 100, //字体大小，默认值为100
+				height: 5, //挤出文本的厚度。默认值为50
+				curveSegments: 12, //表示文本的）曲线上点的数量。默认值为12
+				bevelEnabled: true, //是否开启斜角，默认为false
+				bevelThickness: 10, //文本上斜角的深度，默认值为20
+				bevelSize: 2, //斜角与原始文本轮廓之间的延伸距离。默认值为8
+				bevelSegments: 5 //斜角的分段数。默认值为3
+			});
+			const material = new THREE.MeshPhongMaterial({
+				color: 0xff0000
+			})
+			fontMesh = new THREE.Mesh(geometry, material)
+			fontMesh.position.set(0, 100, 500);
+			fontMesh.rotation.y = Math.PI;
+			scene.add(fontMesh);
+		})
+
+		setTimeout(removeFont, 1000);
+	}
+
+	let gameEnded = false;
+
+	function gameOver() {
+		if (gameEnded) return;
+		gameEnded = true;
+		const fontLoader = new FontLoader();
+		fontLoader.load("./lib/gentilis_bold.typeface.json", function(font) {
+			const geometry = new TextGeometry('Game over!', {
+				font: font,
+				size: 100, //字体大小，默认值为100
+				height: 5, //挤出文本的厚度。默认值为50
+				curveSegments: 12, //表示文本的）曲线上点的数量。默认值为12
+				bevelEnabled: true, //是否开启斜角，默认为false
+				bevelThickness: 10, //文本上斜角的深度，默认值为20
+				bevelSize: 2, //斜角与原始文本轮廓之间的延伸距离。默认值为8
+				bevelSegments: 5 //斜角的分段数。默认值为3
+			});
+			const material = new THREE.MeshPhongMaterial({
+				color: 0xff0000
+			})
+			fontMesh = new THREE.Mesh(geometry, material)
+			fontMesh.position.set(0, 100, 500);
+			fontMesh.rotation.y = Math.PI;
+			scene.add(fontMesh);
+		})
+
+	}
+
+	function removeFont() {
+		console.log("remove font");
+		if (fontMesh) {
+			fontMesh.visible = false;
+			scene.remove(fontMesh);
+		}
 		gameLevel += 1;
 		createMonster();
 	}
@@ -644,7 +761,8 @@ function init(level) {
 
 
 	function bomMonster(monster) {
-
+		if (monster.bom)
+			return;
 		monster.traverse(function(obj) {
 			// 判断子对象是否是物体，如果是，更改其颜色
 			if (obj.isMesh) {
@@ -658,8 +776,9 @@ function init(level) {
 			}
 		});
 		monster.bom = true;
-		monster.alive = false;
-		//audioObject["boom"].play();
+		monster.action = "death";
+		switchMonsterAction(monster, "death", 0.5);
+		audioObject["boom"].play();
 	}
 
 
@@ -672,8 +791,7 @@ function init(level) {
 		"./model/jumping.fbx",
 		"./model/shooting.fbx",
 		"./model/death.fbx",
-		"./model/monster_walk.fbx",
-		"./model/m3.fbx"
+		"./model/monster_walk.fbx"
 	];
 
 	let clipActions = [];
@@ -700,7 +818,7 @@ function init(level) {
 
 					loader.load(resFile, function(obj) {
 
-						if (resFile.endsWith("m3.fbx")) {
+						if (resFile.endsWith("Mousey.fbx")) {
 							enemyModel = obj;
 						} else {
 							clipActions.push(obj.animations[0]);
@@ -789,6 +907,12 @@ function init(level) {
 		player.skeletonHelper.material.linewidth = 30;
 
 		scene.add(player.skeletonHelper);
+
+
+		let box = new THREE.Box3().setFromObject(player.model);
+		const helper = new THREE.Box3Helper(box, 0xff0000);
+		//scene.add( helper );
+		//player.boxHelper = helper;
 
 		player.model.castShadow = true;
 		player.model.children.forEach(child => {
@@ -883,7 +1007,7 @@ function init(level) {
 			//console.log("need to fire");
 		}
 	}
-	
+
 	function switchMonsterAction(player, newActionName, fadeDuration = 0.1) {
 		if (newActionName !== 'death' && newActionName !== 'idle' && !player.alive) {
 			return;
@@ -895,7 +1019,7 @@ function init(level) {
 			if (player.previousAction) {
 				player.previousAction.fadeOut(fadeDuration);
 			}
-	
+
 			if (newActionName === 'jump' || newActionName === 'death' ||
 				newActionName === 'walk_forward' || newActionName === 'shoot' ||
 				newActionName === 'walk_backward' || newActionName === 'walk_left' ||
@@ -903,12 +1027,12 @@ function init(level) {
 				newAction.loop = THREE.LoopOnce;
 				newAction.clampWhenFinished = true;
 			}
-	
+
 			player.currentAction = newAction;
-	
+
 			player.currentAction.reset();
-			
-			player.currentAction.setEffectiveTimeScale(0.5);
+
+			player.currentAction.setEffectiveTimeScale(1);
 			player.currentAction.setEffectiveWeight(1);
 			player.currentAction.fadeIn(fadeDuration).play();
 		} else if (newAction && player.currentAction === newAction && newActionName === 'shoot') {
@@ -918,8 +1042,6 @@ function init(level) {
 
 	function setFloor() {
 
-
-
 		const floorMap = textureLoader.load("./lib/floor.jpg");
 		const floorMaterial = new THREE.MeshPhongMaterial({
 			specular: '#cf9886',
@@ -927,7 +1049,7 @@ function init(level) {
 			map: floorMap
 		});
 		floorMaterial.map.colorSpace = THREE.SRGBColorSpace;
-		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), floorMaterial);
+		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), floorMaterial);
 		mesh.rotation.x = -Math.PI / 2;
 		mesh.receiveShadow = true;
 		scene.add(mesh);
@@ -992,7 +1114,7 @@ function init(level) {
 
 
 	// scene
-	//setScene();
+	setScene();
 	setBackground();
 	setFloor();
 	setLight();
@@ -1216,14 +1338,8 @@ function init(level) {
 		monsterArr.forEach(item => {
 			if (item.alive) {
 				monsterList.push(item);
-			}
-			if (item && item.bom) {
-				if (item.bomTimer < 20) {
-					monsterList.push(item);
-				} else {
-					scene.remove(item);
-					item = null;
-				}
+			} else {
+				scene.remove(item);
 			}
 		});
 		monsterArr = monsterList;
@@ -1232,9 +1348,6 @@ function init(level) {
 
 			if (item.alive) {
 				monsterAct(item);
-			}
-			if (item.bom) {
-
 			}
 		});
 
@@ -1250,7 +1363,7 @@ function init(level) {
 		}
 		monsterArr.forEach(item => {
 
-			if (item.alive) {
+			if (item.alive || item.bom) {
 				item.animationMixer.update(delta);
 			}
 		});
@@ -1265,11 +1378,12 @@ function init(level) {
 		if (app.doublePlayer)
 			playerBox2 = new THREE.Box3().setFromObject(player2.model);
 		monsterArr.forEach(item => {
-			if (item.alive) {
+			if (item.alive && !item.bom) {
 				let boxMeshBox = new THREE.Box3().setFromObject(item);
+				//console.log(boxMeshBox);
 				if (playerBox.intersectsBox(boxMeshBox)) {
-					//player1.life -= 100;
-					//item.life -= 100;
+					player1.life -= 100;
+					item.life -= 100;
 
 				}
 				if (playerBox2 && playerBox2.intersectsBox(boxMeshBox)) {
@@ -1280,7 +1394,7 @@ function init(level) {
 				wallArr.forEach(wall => {
 					let wallMeshBox = new THREE.Box3().setFromObject(wall);
 					if (wallMeshBox.intersectsBox(boxMeshBox)) {
-						//item.life -= 100;
+						item.life -= 100;
 					}
 				})
 				bulletArr.filter(x => x.human).forEach(bullet => {
@@ -1313,10 +1427,12 @@ function init(level) {
 		bulletArr.filter(x => x.human == false).forEach(bullet => {
 			let bulletMeshBox = new THREE.Box3().setFromObject(bullet.obj);
 			if (playerBox.intersectsBox(bulletMeshBox)) {
+				beShoot(player1);
 				player1.life -= 2;
 				bullet.alive = false;
 			}
 			if (playerBox2 && playerBox2.intersectsBox(bulletMeshBox)) {
+				beShoot(player2);
 				player2.life -= 2;
 				bullet.alive = false;
 			}
@@ -1324,7 +1440,6 @@ function init(level) {
 
 		monsterArr.forEach(item => {
 			if (item.life <= 0) {
-				item.alive = false;
 				bomMonster(item);
 			}
 		})
@@ -1336,6 +1451,8 @@ function init(level) {
 			switchAction(player2, "death");
 			player2.alive = false;
 		}
+
+
 		app.player1Life = player1.life < 0 ? 0 : player1.life;
 		app.player1Score = player1.score;
 		app.player2Life = player2.life < 0 ? 0 : player2.life;
@@ -1359,6 +1476,18 @@ function init(level) {
 		if (bulletArr.length > 0)
 			needCompose = true;
 
+		if (app.doublePlayer) {
+			if (!player1.alive && !player2.alive) {
+				gameOver();
+			}
+		} else {
+			if (!player1.alive) {
+				gameOver();
+			}
+		}
+		if (tween) {
+			tween.update();
+		}
 		renderer.render(scene, camera);
 		requestAnimationFrame(animate);
 	}
