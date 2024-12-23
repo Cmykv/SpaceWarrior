@@ -87,7 +87,8 @@ let app = new Vue({
 		player1Life: 0,
 		player2Score: 0,
 		player2Life: 0,
-		level: 1
+		level: 1,
+		online: false
 	},
 });
 
@@ -101,6 +102,11 @@ document.getElementById("btn_start_1").onclick = () => {
 document.getElementById("btn_start_2").onclick = () => {
 	modal.style.display = "none";
 	app.doublePlayer = true;
+	init(1);
+}
+document.getElementById("btn_start_3").onclick = () => {
+	modal.style.display = "none";
+	app.online = true;
 	init(1);
 }
 
@@ -252,7 +258,9 @@ function init(level) {
 		alive: true,
 		life: 10,
 		foot: null,
-		shootHelper: null
+		shootHelper: null,
+		positionX: Math.floor(Math.random() * 400),
+		positionZ: Math.floor(Math.random() * 400)
 	};
 	let player2 = {
 		id: 2,
@@ -269,8 +277,13 @@ function init(level) {
 		alive: true,
 		life: 10,
 		foot: null,
-		shootHelper: null
+		shootHelper: null,
+		positionX: Math.floor(Math.random() * 400),
+		positionZ: Math.floor(Math.random() * 400)
 	};
+
+	let onlinePlayers = [];
+
 
 	const uniforms = {
 		iTime: {
@@ -402,7 +415,7 @@ function init(level) {
 		);
 
 		water.position.y = 1;
-		water.rotation.x = Math.PI * - 0.5;
+		water.rotation.x = Math.PI * -0.5;
 
 		scene.add(water);
 
@@ -653,43 +666,6 @@ function init(level) {
 	}
 
 
-
-	function createMonsterRock() {
-		let r = monsterRadius;
-		let x = THREE.MathUtils.randFloatSpread(1000) - 500;
-		let y = 120;
-		let z = 1088;
-		const geometry = new THREE.SphereGeometry(r, 10, 10);
-		const material = new THREE.MeshPhongMaterial({
-			color: "#0000ff"
-		});
-		const group = new THREE.Group();
-		for (let i = -3; i <= 3; i++)
-			for (let j = -3; j <= 3; j++)
-				for (let m = -3; m <= 3; m++) {
-					let ball = new THREE.Mesh(geometry, material)
-					ball.position.set(i * 2 * r, j * 2 * r, m * 2 * r);
-					group.add(ball);
-				}
-		group.bom = false;
-		group.bomTimer = 0;
-		group.bomSpeed = 5;
-		group.alive = true;
-		group.speed = 5;
-		group.angle = 0;
-		group.life = 100;
-		group.action = "move";
-		group.moveDuration = 1000;
-		group.rotDuration = 1000;
-		group.fireDuration = 5000;
-		group.direction = [0, 0];
-		group.actionClock = 0;
-		group.targetRot = 0;
-		group.fired = false;
-		group.position.set(x, y, z);
-		scene.add(group);
-		monsterArr.push(group);
-	}
 	const stoneMass = 120;
 	let enemy_model;
 
@@ -749,12 +725,6 @@ function init(level) {
 			group.actionClock = Date.now();
 			group.targetRot = 0;
 			group.fired = false;
-
-
-			//let box = new THREE.Box3().setFromObject(group);
-			//const helper = new THREE.Box3Helper( box, 0xff0000 );
-			//helper.updateWorldMatrix();
-			//scene.add( helper );
 
 			scene.add(group);
 			group.currentAction = group.actions["idle"];
@@ -964,9 +934,61 @@ function init(level) {
 		);
 	}
 
+	let ws = null;
+
 	function beginGame() {
+
+
+		if (app.online) {
+			if ('WebSocket' in window) {
+
+				ws = new WebSocket('ws://127.0.0.1:80/websocket');
+
+				ws.onopen = () => {
+					console.log('websocket success---');
+					ws.send('position ' + player1.positionX + ' ' + player1.positionZ);
+				}
+				ws.onmessage = (message) => {
+					let data = message.data;
+					console.log('get websocket message---', data);
+					if (data.indexOf('player') >= 0) {
+						let list = data.split(' ');
+						let obj = {
+							id: parseInt(list[1]),
+							model: null,
+							avatarRotY: 0,
+							currentActionName: "idle",
+							currentAction: null,
+							previousAction: null,
+							skeletonHelper: null,
+							actions: [],
+							animationMixer: null,
+							damage: 20,
+							score: 0,
+							alive: true,
+							life: 10,
+							foot: null,
+							shootHelper: null,
+							positionX: parseInt(list[2]),
+							positionZ: parseInt(list[3])
+						};
+						crtOnlinePlayer(obj);
+					}
+					if (data.indexOf('key') >= 0) {
+						let list = data.split(' ');
+						doOnlinePlayerAct(parseInt(list[2]), list[1]);
+					}
+				}
+				ws.onerror = () => {
+					console.error('websocket fail');
+				}
+			} else {
+				console.error('dont support websocket');
+			};
+		}
+
 		player2.model = SkeletonUtils.clone(player1.model);
-		initPlayer(player2, new THREE.Vector3(100, 0, 0))
+		initPlayer(player2, new THREE.Vector3(player2.positionX, 0, player2.positionZ));
 		if (!app.doublePlayer) {
 			player2.model.visible = false;
 			player2.foot.visible = false;
@@ -1012,6 +1034,62 @@ function init(level) {
 
 	}
 
+	function crtOnlinePlayer(player) {
+		player.model = SkeletonUtils.clone(player1.model);
+		player.model.castShadow = true;
+		player.model.children.forEach(child => {
+			child.castShadow = true;
+		});
+		scene.add(player.model);
+		player.model.position.set(player.positionX, 0, player.positionZ);
+		player.animationMixer = new THREE.AnimationMixer(player.model);
+		player.actions["walk_forward"] = player.animationMixer.clipAction(clipActions[0]);
+		player.actions["walk_backward"] = player.animationMixer.clipAction(clipActions[1]);
+		player.actions["walk_left"] = player.animationMixer.clipAction(clipActions[2]);
+		player.actions["walk_right"] = player.animationMixer.clipAction(clipActions[3]);
+		player.actions["idle"] = player.animationMixer.clipAction(clipActions[4]);
+		player.actions["jump"] = player.animationMixer.clipAction(clipActions[5]);
+		player.actions["shoot"] = player.animationMixer.clipAction(clipActions[6]);
+		player.actions["death"] = player.animationMixer.clipAction(clipActions[7]);
+		player.actions["idle"].play();
+		player.currentActionName = "idle";
+		player.currentAction = player.actions["idle"];
+
+		onlinePlayers.push(player);
+
+	}
+
+	function doOnlinePlayerAct(id, key) {
+		let player = null;
+		onlinePlayers.forEach(item => {
+			if (item.id === id) {
+				player = item;
+			}
+		})
+		if (player) {
+			switch (key) {
+				case "w":
+					switchAction(player, 'walk_forward');
+					break;
+				case "a":
+					switchAction(player, 'walk_left');
+					break;
+				case "d":
+					switchAction(player, 'walk_right');
+					break;
+				case "s":
+					switchAction(player, 'walk_backward');
+					break;
+				case "j":
+					switchAction(player, 'shoot');
+					break;
+				case "k":
+					switchAction(player, 'jump');
+					break;
+			}
+		}
+	}
+
 	function initPlayer(player, pos) {
 		player.model.position.set(pos.x, pos.y, pos.z);
 		player.skeletonHelper = new THREE.SkeletonHelper(player.model);
@@ -1021,11 +1099,6 @@ function init(level) {
 		scene.add(player.skeletonHelper);
 
 
-		let box = new THREE.Box3().setFromObject(player.model);
-		const helper = new THREE.Box3Helper(box, 0xff0000);
-		//scene.add( helper );
-		//player.boxHelper = helper;
-
 		player.model.castShadow = true;
 		player.model.children.forEach(child => {
 			child.castShadow = true;
@@ -1034,7 +1107,7 @@ function init(level) {
 		player.avatarRotY = player.model.rotation.y;
 
 		const geometry = new THREE.CircleGeometry(40, 32, 0, Math.PI * 2);
-		let color = player.id == 1 ? 0xff0000 : 0x0000ff;
+		let color = 0xff0000;
 		const material = new THREE.MeshBasicMaterial({
 			color: color,
 			side: THREE.DoubleSide,
@@ -1090,7 +1163,6 @@ function init(level) {
 		if (newActionName !== 'death' && newActionName !== 'idle' && !player.alive) {
 			return;
 		}
-		console.log("switch to action " + newActionName, player.id)
 		const newAction = player.actions[newActionName];
 		if (newAction && player.currentAction !== newAction) {
 			player.previousAction = player.currentAction;
@@ -1198,7 +1270,7 @@ function init(level) {
 	setHelper();
 	setControll();
 	createWall();
-	loadAvatar(player1, new THREE.Vector3(-100, 0, 0));
+	loadAvatar(player1, new THREE.Vector3(player1.positionX, 0, player1.positionZ));
 	loadMp3();
 
 	let colors = ["red", "blue", "green"];
@@ -1329,8 +1401,8 @@ function init(level) {
 			if (canMove) {
 				let dz = 2;
 				player.model.position.z += dz;
-				player.foot.position.z = player.model.position.z;
-				player.shootHelper.position.z = player.model.position.z;
+				if (player.foot) player.foot.position.z = player.model.position.z;
+				if (player.shootHelper) player.shootHelper.position.z = player.model.position.z;
 			}
 		}
 		if (
@@ -1347,8 +1419,8 @@ function init(level) {
 			if (canMove) {
 				let dz = -2;
 				player.model.position.z += dz;
-				player.foot.position.z = player.model.position.z;
-				player.shootHelper.position.z = player.model.position.z;
+				if (player.foot) player.foot.position.z = player.model.position.z;
+				if (player.shootHelper) player.shootHelper.position.z = player.model.position.z;
 			}
 		}
 		if (
@@ -1365,8 +1437,10 @@ function init(level) {
 			if (canMove) {
 				let dx = 4;
 				player.model.position.x += dx;
-				player.foot.position.x = player.model.position.x;
-				player.shootHelper.position.x = player.model.position.x;
+				if (player.foot)
+					player.foot.position.x = player.model.position.x;
+				if (player.shootHelper)
+					player.shootHelper.position.x = player.model.position.x;
 			}
 		}
 		if (
@@ -1383,8 +1457,8 @@ function init(level) {
 			if (canMove) {
 				let dx = -4;
 				player.model.position.x += dx;
-				player.foot.position.x = player.model.position.x;
-				player.shootHelper.position.x = player.model.position.x;
+				if (player.foot) player.foot.position.x = player.model.position.x;
+				if (player.shootHelper) player.shootHelper.position.x = player.model.position.x;
 			}
 		}
 	}
@@ -1456,6 +1530,10 @@ function init(level) {
 		handleActions(player1);
 		if (app.doublePlayer)
 			handleActions(player2);
+		onlinePlayers.forEach(item => {
+			item.animationMixer.update(delta);
+			handleActions(item);
+		})
 
 		// check collide
 		let playerBox = new THREE.Box3().setFromObject(player1.model);
@@ -1521,6 +1599,13 @@ function init(level) {
 				player2.life -= 2;
 				bullet.alive = false;
 			}
+			onlinePlayers.forEach(obj => {
+				let box = new THREE.Box3().setFromObject(wall);
+				if (playerBox.intersectsBox(bulletMeshBox)) {
+					obj.life -= 2;
+					bullet.alive = false;
+				}
+			})
 		});
 
 		monsterArr.forEach(item => {
@@ -1544,7 +1629,7 @@ function init(level) {
 		app.player2Score = player2.score;
 		app.level = gameLevel;
 		uniforms.iTime.value += 0.05;
-		water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
+		water.material.uniforms['time'].value += 1.0 / 60.0;
 		stats.update();
 
 		const timer = Date.now() * 0.000025;
@@ -1593,24 +1678,36 @@ function init(level) {
 			case "w":
 				//camera.position.set(x + step, y, z);
 				switchAction(player1, 'walk_forward');
+				if (ws)
+					ws.send("key w")
 				break;
 			case "a":
 				switchAction(player1, 'walk_left');
+				if (ws)
+					ws.send("key a")
 				//avatar.rotation.y = avatarRotY;
 				break;
 			case "d":
 				switchAction(player1, 'walk_right');
+				if (ws)
+					ws.send("key d")
 				//avatar.rotation.y = avatarRotY;
 				break;
 			case "s":
 				switchAction(player1, 'walk_backward');
+				if (ws)
+					ws.send("key s")
 				//avatar.rotation.y = avatarRotY;
 				break;
 			case "j":
 				switchAction(player1, 'shoot');
+				if (ws)
+					ws.send("key j")
 				break;
 			case "k":
 				switchAction(player1, 'jump');
+				if (ws)
+					ws.send("key k")
 				break;
 
 			case "ArrowRight":
