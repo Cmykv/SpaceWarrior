@@ -946,7 +946,8 @@ function init(level) {
 
 				ws.onopen = () => {
 					console.log('websocket success---');
-					ws.send('position ' + player1.positionX + ' ' + player1.positionZ);
+					ws.send('init ' + player1.positionX + ' ' + player1.positionZ);
+					beginSync();
 				}
 				ws.onmessage = (message) => {
 					let data = message.data;
@@ -1026,12 +1027,23 @@ function init(level) {
 		selectedObjects = [];
 		selectedObjects.push(player1.model);
 		outlinePass.selectedObjects = selectedObjects;
+		
 
 		//////////////////////////////////////
-
+		
 		momsterBegin();
 		animate();
 
+	}
+	
+	function beginSync()
+	{
+		setInterval(()=>{
+			if(ws)
+			{
+				ws.send('sync ' + player1.model.position.x + ' ' + player1.model.position.z);
+			}
+		},300);
 	}
 
 	function crtOnlinePlayer(player) {
@@ -1600,7 +1612,7 @@ function init(level) {
 				bullet.alive = false;
 			}
 			onlinePlayers.forEach(obj => {
-				let box = new THREE.Box3().setFromObject(wall);
+				let box = new THREE.Box3().setFromObject(obj.model);
 				if (playerBox.intersectsBox(bulletMeshBox)) {
 					obj.life -= 2;
 					bullet.alive = false;
