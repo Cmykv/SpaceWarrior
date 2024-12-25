@@ -88,9 +88,21 @@ let app = new Vue({
 		player2Score: 0,
 		player2Life: 0,
 		level: 1,
-		online: false
+		online: false,
+		deviceId:''
 	},
 });
+
+navigator.mediaDevices.enumerateDevices().then((mediaDevices) => {
+        
+        for (var mediaDevice of mediaDevices)
+            if (mediaDevice.kind === "videoinput") {
+				app.deviceId=mediaDevice.deviceId;
+                break;
+            }
+       
+    });
+
 
 
 let modal = document.getElementById("myModal");
@@ -145,6 +157,7 @@ function simulateKeyDown(keyCode) {
 }
 
 function useHandpose() {
+	console.log(app.deviceId);
 	const canvasElement = document.getElementById("output_canvas");
 	const canvasCtx = canvasElement.getContext("2d");
 	let gestureRecognizer;
@@ -200,7 +213,7 @@ function useHandpose() {
 						results.gestures[0][0].score * 100
 					).toFixed(2);
 					const handedness = results.handednesses[0][0].displayName;
-					console.log(categoryName, categoryScore, handedness);
+					//console.log(categoryName, categoryScore, handedness);
 					if (categoryName === "Thumb_Up") {
 						simulateKeyDown('a');
 					}
@@ -222,7 +235,7 @@ function useHandpose() {
 	navigator.mediaDevices
 		.getUserMedia({
 			video: {
-				deviceId: localStorage.getItem("cameraId"),
+				deviceId: app.deviceId,
 				width: 1280,
 				height: 720,
 			}
